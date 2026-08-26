@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -10,6 +11,8 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / ".autonomous-build.log"
 DEADLINE_HOURS = float(os.environ.get("LUMEN_BUILD_HOURS", "8"))
+CODER_MODEL = os.environ.get("LUMEN_CODEx_MODEL", "gpt-5.3-codex-spark")
+PASS_TIMEOUT_SECONDS = int(os.environ.get("LUMEN_PASS_TIMEOUT_SECONDS", "600"))
 
 PASSES = [
     """Build the first complete Lumen Garden MVP from AGENTS.md, PRODUCT.md, and DESIGN.md. Work test-first on the versioned domain model and persistence layer, then implement all primary screens and flows. Replace the Vite starter completely. Add Vitest and Testing Library. Run lint, tests, and production build. Do not stop at scaffolding or a plan; leave a coherent usable app and commit it.""",
@@ -34,6 +37,10 @@ def write_log(message: str) -> None:
 
 
 def run(args: list[str], timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+    if isinstance(args, list) and args:
+        resolved = shutil.which(args[0])
+        if resolved:
+            args = [resolved, *args[1:]]
     return subprocess.run(
         args,
         cwd=ROOT,
@@ -70,17 +77,19 @@ def main() -> int:
             "and commit it. Do not repeat earlier work or add speculative infrastructure."
         )
         remaining = int(deadline - time.monotonic())
-        timeout = max(600, min(3600, remaining - 240))
+        timeout = max(120, min(PASS_TIMEOUT_SECONDS, remaining - 240))
         write_log(f"pass {index + 1} starting; {remaining // 60} minutes remain")
         try:
             result = run(
                 [
                     "codex",
+                    "--ask-for-approval",
+                    "never",
+                    "-m",
+                    CODER_MODEL,
                     "exec",
                     "--sandbox",
                     "workspace-write",
-                    "-a",
-                    "never",
                     "-C",
                     str(ROOT),
                     prompt,
