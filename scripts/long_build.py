@@ -60,6 +60,9 @@ def commit_if_changed(index: int) -> None:
     run(["git", "add", "-A"], timeout=120)
     result = run(["git", "commit", "-m", f"chore: autonomous refinement pass {index}"], timeout=120)
     write_log(f"pass {index}: fallback commit exit={result.returncode}")
+    if result.returncode == 0:
+        push = run(["git", "push", "origin", "HEAD"], timeout=180)
+        write_log(f"pass {index}: push exit={push.returncode}")
 
 
 def main() -> int:
