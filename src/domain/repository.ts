@@ -73,6 +73,10 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function asFreeText(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
 function isSeedId(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
@@ -228,6 +232,99 @@ function normalizeDurationMinutes(raw: unknown): number {
   return 25
 }
 
+function requiredCollection(data: Record<string, unknown>, key: string): unknown[] {
+  const value = data[key]
+  if (!Array.isArray(value)) {
+    throw new Error(`Import is missing required collection: ${key}`)
+  }
+  return value
+}
+
+function requiredRecord(raw: unknown, label: string): Record<string, unknown> {
+  const value = asRecord(raw)
+  if (!value) {
+    throw new Error(`Imported ${label} must be an object`)
+  }
+  return value
+}
+
+function requiredId(data: Record<string, unknown>, label: string): string {
+  if (!isSeedId(data.id)) {
+    throw new Error(`Imported ${label} is missing an id`)
+  }
+  return data.id.trim()
+}
+
+function assertUniqueIds(items: unknown[], label: string): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    const id = requiredId(requiredRecord(item, label), label)
+    if (ids.has(id)) {
+      throw new Error(`Imported ${label} ids must be unique`)
+    }
+    ids.add(id)
+  }
+  return ids
+}
+
+function validateCurrentPayload(raw: LegacyPayload): void {
+  const data = raw as Record<string, unknown>
+  const beds = requiredCollection(data, 'beds')
+  const seeds = requiredCollection(data, 'seeds')
+  const threads = requiredCollection(data, 'threads')
+  const focusSessions = requiredCollection(data, 'focusSessions')
+  const meta = asRecord(data.meta)
+
+  if (!meta) {
+    throw new Error('Import is missing required metadata')
+  }
+
+  const bedIds = assertUniqueIds(beds, 'bed')
+  const seedIds = assertUniqueIds(seeds, 'seed')
+  assertUniqueIds(threads, 'thread')
+  assertUniqueIds(focusSessions, 'focus session')
+
+  for (const rawSeed of seeds) {
+    const seed = requiredRecord(rawSeed, 'seed')
+    if (asText(seed.text).length === 0) {
+      throw new Error('Imported seed text must not be empty')
+    }
+    if (seed.bedId !== undefined && (!isSeedId(seed.bedId) || !bedIds.has(seed.bedId))) {
+      throw new Error('Imported seed refers to a missing bed')
+    }
+  }
+
+  for (const rawThread of threads) {
+    const thread = requiredRecord(rawThread, 'thread')
+    const fromSeedId = asText(thread.fromSeedId)
+    const toSeedId = asText(thread.toSeedId)
+    if (!seedIds.has(fromSeedId) || !seedIds.has(toSeedId)) {
+      throw new Error('Imported thread refers to a missing seed')
+    }
+    if (fromSeedId === toSeedId) {
+      throw new Error('Imported thread cannot connect a seed to itself')
+    }
+    if (thread.relation !== 'supports' && thread.relation !== 'extends' && thread.relation !== 'blocks') {
+      throw new Error('Imported thread has an invalid thread relation')
+    }
+  }
+
+  const activeSessionIds = new Set<string>()
+  for (const rawSession of focusSessions) {
+    const session = requiredRecord(rawSession, 'focus session')
+    const seedId = asText(session.seedId)
+    if (!seedIds.has(seedId)) {
+      throw new Error('Imported focus session refers to a missing seed')
+    }
+    if (session.status === 'running' || session.status === 'paused') {
+      if (activeSessionIds.size > 0) {
+        throw new Error('Imported garden has more than one active focus session')
+      }
+      activeSessionIds.add(seedId)
+    }
+  }
+}
+
 function validateLegacyPayload(raw: LegacyPayload): boolean {
   return (
     Array.isArray(raw.items) ||
@@ -318,7 +415,12 @@ function parsePayload(
   }
 
   const schemaVersion = getSchemaVersion(data, CURRENT_SCHEMA_VERSION)
-  if (schemaVersion >= CURRENT_SCHEMA_VERSION && Array.isArray((data as LegacyPayload).beds)) {
+  if (schemaVersion > CURRENT_SCHEMA_VERSION) {
+    throw new Error(`Cannot import newer schema version ${schemaVersion}`)
+  }
+
+  if (schemaVersion === CURRENT_SCHEMA_VERSION && Array.isArray((data as LegacyPayload).beds)) {
+    validateCurrentPayload(data as LegacyPayload)
     return normalizeCurrentPayload(data as LegacyPayload, now, idFactory)
   }
 
@@ -597,6 +699,7 @@ export class GardenRepository {
       throw new Error('Archived seed cannot be focused')
     }
     const duration = normalizeDurationMinutes(durationMinutes)
+    const previousSeedStatus = seed.status
 
     this.commit((state) => {
       const existing = this.getActiveFocusSession()
@@ -605,7 +708,8 @@ export class GardenRepository {
         existing.endedAt = this.now()
         const seedInFocus = state.seeds.find((item) => item.id === existing.seedId)
         if (seedInFocus) {
-          seedInFocus.status = seedInFocus.status === 'archived' ? 'archived' : 'active'
+          seedInFocus.status = seedInFocus.status === 'archived' ? 'archived' : existing.previousSeedStatus
+          seedInFocus.updatedAt = this.now()
 
         }
       }
@@ -623,7 +727,7 @@ export class GardenRepository {
         status: 'running',
         startedAt: this.now(),
         accumulatedPauseMs: 0,
-        previousSeedStatus: activeSeed.status === 'focused' ? 'active' : activeSeed.status,
+        previousSeedStatus,
       }
       state.focusSessions.unshift(session)
 
@@ -667,7 +771,7 @@ export class GardenRepository {
       if (!session) {
         throw new Error(`Focus session not found: ${sessionId}`)
       }
-      session.outcome = asText(outcome)
+      session.outcome = asFreeText(outcome)
     })
   }
 

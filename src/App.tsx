@@ -24,9 +24,13 @@ const RECENCY_OPTIONS = ['all', '7', '30', '90'] as const
 type RecencyFilter = (typeof RECENCY_OPTIONS)[number]
 
 
-const REPOSITORY = new GardenRepository(globalThis?.localStorage, {
+const DEFAULT_REPOSITORY = new GardenRepository(globalThis?.localStorage, {
   storageKey: 'lumen-garden:local-repository',
 })
+
+type AppProps = {
+  repository?: GardenRepository
+}
 
 function getElapsedMs(session: FocusSession, now: number): number {
   if (session.status === 'completed' || session.status === 'abandoned') {
@@ -56,17 +60,7 @@ function byRecent(a: { updatedAt: number }, b: { updatedAt: number }): number {
   return b.updatedAt - a.updatedAt
 }
 
-function groupBy<T, K extends string>(items: T[], key: (item: T) => K): Record<K, T[]> {
-  return items.reduce((acc, item) => {
-    const k = key(item)
-    const bucket = acc[k] ?? []
-    bucket.push(item)
-    acc[k] = bucket
-    return acc
-  }, {} as Record<K, T[]>)
-}
-
-function App() {
+function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   const [view, setView] = useState<MainView>('inbox')
   const [captureText, setCaptureText] = useState('')
   const [captureNote, setCaptureNote] = useState('')
@@ -80,7 +74,7 @@ function App() {
   const [filterBed, setFilterBed] = useState<string>('all')
   const [filterRecency, setFilterRecency] = useState<RecencyFilter>('all')
   const [focusDuration, setFocusDuration] = useState(25)
-  const [focusOutcome, setFocusOutcome] = useState('')
+  const [focusSeedId, setFocusSeedId] = useState('')
   const [newBedName, setNewBedName] = useState('')
   const [newBedIntent, setNewBedIntent] = useState('')
   const [newBedColor, setNewBedColor] = useState('#2f8f94')
@@ -88,49 +82,49 @@ function App() {
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const captureInputRef = useRef<HTMLInputElement>(null)
 
   const state = useSyncExternalStore(
-    (listener) => REPOSITORY.subscribe(listener),
-    () => REPOSITORY.getSnapshot(),
-    () => REPOSITORY.getSnapshot(),
+    (listener) => repository.subscribe(listener),
+    () => repository.getSnapshot(),
+    () => repository.getSnapshot(),
   )
-  const undo = REPOSITORY.getUndoState()
-  const activeSession = REPOSITORY.getActiveFocusSession()
+  const undo = repository.getUndoState()
+  const activeSession = repository.getActiveFocusSession()
+  const activeSessionId = activeSession?.id
+  const selectedSeed = useMemo(
+    () => state.seeds.find((seed) => seed.id === selectedSeedId) ?? state.seeds[0] ?? null,
+    [state.seeds, selectedSeedId],
+  )
 
   useEffect(() => {
-    if (!state.seeds.some((seed) => seed.id === selectedSeedId)) {
-      const firstSeed = state.seeds[0] ?? null
-      setSelectedSeedId(firstSeed?.id ?? '')
-    }
-  }, [state.seeds, selectedSeedId])
-
-  useEffect(() => {
-    if (activeSession?.outcome) {
-      setFocusOutcome(activeSession.outcome)
-    } else {
-      setFocusOutcome('')
-    }
-  }, [activeSession?.id])
-
-  useEffect(() => {
-    if (view === 'focus' && activeSession) {
+    if (view === 'focus' && activeSessionId) {
       const interval = window.setInterval(() => {
         setNowTick(Date.now())
       }, 1000)
       return () => clearInterval(interval)
     }
     return undefined
-  }, [view, activeSession?.id])
+  }, [view, activeSessionId])
 
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent): void => {
       if (event.defaultPrevented) return
+      if (event.key === 'Escape' && isCommandPaletteOpen) {
+        setIsCommandPaletteOpen(false)
+        return
+      }
       const target = event.target as HTMLElement
       const activeTag = target?.tagName?.toLowerCase()
       const isTyping = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select'
       if (isTyping || event.metaKey || event.ctrlKey || event.altKey) {
+        return
+      }
+      if (event.key === '?') {
+        event.preventDefault()
+        setIsCommandPaletteOpen(true)
         return
       }
       if ((event.key === 'c' || event.key === 'C') && captureInputRef.current) {
@@ -156,23 +150,21 @@ function App() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [isCommandPaletteOpen])
 
   const inboxSeeds = useMemo(() => state.seeds.filter((seed) => seed.status === 'inbox'), [state.seeds])
 
-  const selectedSeed = useMemo(() => state.seeds.find((seed) => seed.id === selectedSeedId) ?? null, [state.seeds, selectedSeedId])
   const bedOptions = useMemo(() => state.beds.slice().sort(byRecent), [state.beds])
 
   const reviewedSeeds = useMemo(() => {
-    const now = Date.now()
-    const cutoffMs = filterRecency === 'all' ? 0 : now - Number(filterRecency) * 24 * 60 * 60 * 1000
+    const cutoffMs = filterRecency === 'all' ? 0 : nowTick - Number(filterRecency) * 24 * 60 * 60 * 1000
     return state.seeds
       .filter((seed) => (filterStatus === 'all' ? true : seed.status === filterStatus))
       .filter((seed) => (filterBed === 'all' ? true : seed.bedId === filterBed))
       .filter((seed) => (filterTag.length === 0 ? true : seed.tags.includes(filterTag.trim().toLowerCase())))
       .filter((seed) => (filterRecency === 'all' ? true : seed.updatedAt >= cutoffMs))
       .sort(byRecent)
-  }, [filterBed, filterRecency, filterStatus, filterTag, state.seeds])
+  }, [filterBed, filterRecency, filterStatus, filterTag, nowTick, state.seeds])
 
   const activeThreads = useMemo(() => {
     if (!selectedSeed) return []
@@ -190,7 +182,7 @@ function App() {
     if (!window.confirm('Clear seeded demo data from your workspace?')) {
       return
     }
-    REPOSITORY.clearDemoData()
+    repository.clearDemoData()
   }
 
   function handleCapture(event: FormEvent) {
@@ -202,7 +194,7 @@ function App() {
       .map((tag) => tag.trim().toLowerCase())
       .filter((tag) => tag.length > 0)
 
-    REPOSITORY.captureSeed({
+    repository.captureSeed({
       text: captureText,
       note: captureNote || undefined,
       energy: captureEnergy,
@@ -216,20 +208,25 @@ function App() {
     captureInputRef.current?.focus()
   }
 
+  function focusCapture() {
+    setIsCommandPaletteOpen(false)
+    captureInputRef.current?.focus()
+  }
+
   function handleArchive(seedId: string) {
-    REPOSITORY.archiveSeed(seedId)
+    repository.archiveSeed(seedId)
   }
 
   function handleRestore(seedId: string) {
-    REPOSITORY.restoreSeed(seedId)
+    repository.restoreSeed(seedId)
   }
 
   function handleMoveToBed(seedId: string, bedId: string) {
-    REPOSITORY.moveSeedToBed(seedId, bedId)
+    repository.moveSeedToBed(seedId, bedId)
   }
 
   function handleStartFocus(seedId: string) {
-    REPOSITORY.startFocusSession(seedId, focusDuration)
+    repository.startFocusSession(seedId, focusDuration)
     setView('focus')
   }
 
@@ -241,7 +238,7 @@ function App() {
 
   function handlePreviewImport() {
     try {
-      const next = REPOSITORY.previewImport(importText)
+      const next = repository.previewImport(importText)
       setImportError('')
       setImportPreview(next)
     } catch (error) {
@@ -255,7 +252,7 @@ function App() {
       return
     }
     try {
-      REPOSITORY.importData(importText)
+      repository.importData(importText)
       handleClearImportPreview()
     } catch (error) {
       setImportError((error as Error).message)
@@ -263,7 +260,7 @@ function App() {
   }
 
   function handleExport() {
-    const payload = REPOSITORY.exportData()
+    const payload = repository.exportData()
     const blob = new Blob([payload], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -276,7 +273,7 @@ function App() {
   function handleCreateBed(event: FormEvent) {
     event.preventDefault()
     if (newBedName.trim().length === 0) return
-    REPOSITORY.createBed({
+    repository.createBed({
       name: newBedName,
       intent: newBedIntent || 'No intent yet',
       color: newBedColor,
@@ -412,7 +409,7 @@ function App() {
                             <span>{relationLabel(thread.relation)}</span>
                             <button
                               type="button"
-                              onClick={() => REPOSITORY.removeThread(thread.id)}
+                              onClick={() => repository.removeThread(thread.id)}
                               aria-label="Delete thread"
                             >
                               Remove
@@ -430,7 +427,7 @@ function App() {
                     if (!threadTargetId || threadTargetId === selectedSeed.id) {
                       return
                     }
-                    REPOSITORY.addThread(selectedSeed.id, threadTargetId, threadRelation)
+                    repository.addThread(selectedSeed.id, threadTargetId, threadRelation)
                     setThreadTargetId('')
                   }}
                 >
@@ -495,23 +492,23 @@ function App() {
             <textarea
               id="focus-outcome"
               rows={5}
-              value={focusOutcome}
-              onChange={(event) => setFocusOutcome(event.target.value)}
+              value={activeSession.outcome ?? ''}
+              onChange={(event) => repository.setFocusOutcome(activeSession.id, event.target.value)}
             />
             <div className="seed-actions">
               {activeSession.status === 'running' ? (
-                <button type="button" onClick={() => REPOSITORY.pauseFocusSession(activeSession.id)}>
+                <button type="button" onClick={() => repository.pauseFocusSession(activeSession.id)}>
                   Pause
                 </button>
               ) : (
-                <button type="button" onClick={() => REPOSITORY.resumeFocusSession(activeSession.id)}>
+                <button type="button" onClick={() => repository.resumeFocusSession(activeSession.id)}>
                   Resume
                 </button>
               )}
-              <button type="button" onClick={() => REPOSITORY.completeFocusSession(activeSession.id, focusOutcome)}>
+              <button type="button" onClick={() => repository.completeFocusSession(activeSession.id)}>
                 Complete
               </button>
-              <button type="button" onClick={() => REPOSITORY.abandonFocusSession(activeSession.id)}>
+              <button type="button" onClick={() => repository.abandonFocusSession(activeSession.id)}>
                 Abandon
               </button>
             </div>
@@ -534,7 +531,11 @@ function App() {
                 ))}
               </select>
               <label htmlFor="focus-seed">Seed</label>
-              <select id="focus-seed">
+              <select
+                id="focus-seed"
+                value={focusSeedId}
+                onChange={(event) => setFocusSeedId(event.target.value)}
+              >
                 <option value="">Choose seed</option>
                 {candidates.map((seed) => (
                   <option key={seed.id} value={seed.id}>
@@ -546,10 +547,10 @@ function App() {
             <div className="seed-actions">
               <button
                 type="button"
-                onClick={(event) => {
-                  const select = event.currentTarget.previousElementSibling?.previousElementSibling
-                  if (select && select instanceof HTMLSelectElement && select.value.length > 0) {
-                    REPOSITORY.startFocusSession(select.value, focusDuration)
+                onClick={() => {
+                  if (focusSeedId.length > 0) {
+                    repository.startFocusSession(focusSeedId, focusDuration)
+                    setFocusSeedId('')
                   }
                 }}
               >
@@ -646,9 +647,6 @@ function App() {
     )
   }
 
-  const bedsById = useMemo(() => groupBy(state.beds, (bed) => bed.id), [state.beds])
-  const selectedColor = selectedSeed ? bedsById[selectedSeed.bedId ?? '']?.[0]?.color ?? '#3a3a3a' : '#3a3a3a'
-
   return (
     <div className="app-shell">
       <aside className="rail">
@@ -697,7 +695,14 @@ function App() {
             <ul className="bed-list">
               {bedOptions.map((bed) => (
                 <li key={bed.id}>
-                  <button type="button" className="bed-item">
+                  <button
+                    type="button"
+                    className="bed-item"
+                    onClick={() => {
+                      setFilterBed(bed.id)
+                      setView('review')
+                    }}
+                  >
                     <span className="bed-swatch" style={{ '--bed-color': bed.color } as CSSProperties} />
                     <span>{bed.name}</span>
                   </button>
@@ -795,7 +800,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    REPOSITORY.undoLast()
+                    repository.undoLast()
                   }}
                 >
                   Undo
@@ -823,12 +828,14 @@ function App() {
               <input
                 value={captureNote}
                 onChange={(event) => setCaptureNote(event.target.value)}
+                aria-label="Optional note"
                 placeholder="Optional context"
               />
               <input
                 type="text"
                 value={captureTags}
                 onChange={(event) => setCaptureTags(event.target.value)}
+                aria-label="Tags"
                 placeholder="Tags, comma separated"
               />
               <label htmlFor="capture-energy">Energy</label>
@@ -846,21 +853,17 @@ function App() {
               <button type="submit">Capture</button>
             </div>
           </form>
+          <button
+            type="button"
+            className="command-trigger"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            aria-haspopup="dialog"
+          >
+            Commands <kbd>?</kbd>
+          </button>
         </header>
 
-        <div
-          className="workspace"
-          style={
-            selectedSeed
-              ? ({
-                  '--work-color':
-                    bedsById[selectedSeed.bedId ?? '']?.[0]?.color ??
-                    selectedColor,
-                  '--paper-hue': selectedColor ? '#f8f4ee' : '#f6f2eb',
-                } as CSSProperties)
-              : undefined
-          }
-        >
+        <div className="workspace">
           <header className="workspace-head">
             <h2>
               {view === 'inbox'
@@ -881,9 +884,52 @@ function App() {
               ? renderExplore()
               : view === 'focus'
                 ? renderFocus()
-                : renderReview()}
+              : renderReview()}
         </div>
       </main>
+      {isCommandPaletteOpen ? (
+        <div className="command-backdrop" onMouseDown={() => setIsCommandPaletteOpen(false)}>
+          <section
+            className="command-palette"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command menu"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="command-palette-head">
+              <div>
+                <p className="eyebrow">Keyboard command menu</p>
+                <h2>Choose the next move</h2>
+              </div>
+              <button type="button" onClick={() => setIsCommandPaletteOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="command-grid">
+              <button type="button" onClick={focusCapture}>
+                <span>Focus capture</span>
+                <kbd>C</kbd>
+              </button>
+              <button type="button" onClick={() => { setView('inbox'); setIsCommandPaletteOpen(false) }}>
+                <span>Open inbox</span>
+                <kbd>1</kbd>
+              </button>
+              <button type="button" onClick={() => { setView('explore'); setIsCommandPaletteOpen(false) }}>
+                <span>Open constellation</span>
+                <kbd>2</kbd>
+              </button>
+              <button type="button" onClick={() => { setView('focus'); setIsCommandPaletteOpen(false) }}>
+                <span>Open focus</span>
+                <kbd>3</kbd>
+              </button>
+              <button type="button" onClick={() => { setView('review'); setIsCommandPaletteOpen(false) }}>
+                <span>Open review</span>
+                <kbd>4</kbd>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

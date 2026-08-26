@@ -1,18 +1,17 @@
 :root {
-  --ink: #2b261f;
-  --paper: #f7f2ea;
-  --rail: #f2eadd;
-  --line: #cdc0ac;
-  --muted: #746b5f;
-  --accent: #2f8f94;
-  --pollen: #d4ac47;
-  --coral: #ce6f67;
-  --shadow: rgba(36, 27, 17, 0.08) 0 6px 16px;
+  --ink: #282821;
+  --paper: #f1eee6;
+  --rail: #272820;
+  --line: #d2ccc0;
+  --muted: #706d62;
+  --accent: #267f83;
+  --pollen: #c79735;
+  --coral: #bd625d;
   --font-sans: 'Avenir Next', 'Segoe UI', 'Inter', system-ui, sans-serif;
   --font-serif: 'Georgia', 'Times New Roman', serif;
 
-  font: 17px/150% var(--font-sans);
-  letter-spacing: 0.18px;
+  font: 16px/150% var(--font-sans);
+  letter-spacing: 0.01em;
   color: var(--ink);
   background: var(--paper);
   color-scheme: light;
@@ -37,13 +36,13 @@ h4 {
 }
 
 h1 {
-  font-size: 1.85rem;
+  font-size: 1.95rem;
   line-height: 1.05;
   letter-spacing: -0.5px;
 }
 
 h2 {
-  font-size: 1.18rem;
+  font-size: 1.3rem;
 }
 
 h3 {

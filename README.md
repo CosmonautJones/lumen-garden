@@ -44,6 +44,7 @@ The GitHub Actions workflow runs the same checks on every push and pull request 
 | `2` | Constellation |
 | `3` | Focus |
 | `4` | Review |
+| `?` | Open the command menu |
 
 Keyboard shortcuts stay out of text fields and standard modified shortcuts remain untouched.
 
@@ -65,7 +66,7 @@ The domain repository is intentionally separated from React presentation. It own
 
 - Your garden is stored in browser local storage on the current device.
 - Export creates a portable JSON representation of the current garden.
-- Import is parsed and validated before it can replace current data.
+- Import is parsed, schema-validated, previewed, and confirmed before it can replace current data. Unsupported future schema versions, missing collections, duplicate IDs, and dangling references are rejected.
 - Removing demo data, archiving, and relationship deletion are deliberate and reversible where supported.
 - Clearing browser storage removes the local garden. Export before clearing storage if you need a backup.
 
