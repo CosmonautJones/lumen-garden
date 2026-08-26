@@ -93,8 +93,8 @@ function App() {
 
   const state = useSyncExternalStore(
     (listener) => REPOSITORY.subscribe(listener),
-    () => REPOSITORY.getState(),
-    () => REPOSITORY.getState(),
+    () => REPOSITORY.getSnapshot(),
+    () => REPOSITORY.getSnapshot(),
   )
   const undo = REPOSITORY.getUndoState()
   const activeSession = REPOSITORY.getActiveFocusSession()

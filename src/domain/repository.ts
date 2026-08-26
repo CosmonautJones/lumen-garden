@@ -360,6 +360,10 @@ export class GardenRepository {
     return cloneValue(this.state)
   }
 
+  getSnapshot(): GardenState {
+    return this.state
+  }
+
   getUndoState(): { id: string; label: string; createdAt: number } | null {
     const undo = this.undoStack[0]
     if (!undo) {
@@ -759,6 +763,7 @@ export class GardenRepository {
       }
     }
     this.persist()
+    this.state = cloneValue(this.state)
     this.emit()
   }
 

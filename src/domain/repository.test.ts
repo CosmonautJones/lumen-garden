@@ -26,6 +26,17 @@ function createRepository(storage = new MemoryStorage()): GardenRepository {
 }
 
 describe('GardenRepository', () => {
+  it('provides a cached snapshot that changes after a mutation', () => {
+    const repository = createRepository()
+    const beforeCapture = repository.getSnapshot()
+
+    expect(repository.getSnapshot()).toBe(beforeCapture)
+
+    repository.captureSeed({ text: 'Capture with a stable UI snapshot' })
+
+    expect(repository.getSnapshot()).not.toBe(beforeCapture)
+  })
+
   it('persists a captured seed across repository reloads', () => {
     const storage = new MemoryStorage()
     const first = createRepository(storage)
