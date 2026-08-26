@@ -4,14 +4,39 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import { GardenRepository } from './domain/repository'
 
-function createRepository(): GardenRepository {
+class QuotaStorage {
+  private readonly values = new Map<string, string>()
+  failWrites = false
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null
+  }
+
+  setItem(key: string, value: string): void {
+    if (this.failWrites) {
+      throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+    }
+    this.values.set(key, value)
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key)
+  }
+}
+
+function createRepository(
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = window.localStorage,
+  clearDemoData = true,
+): GardenRepository {
   let id = 0
-  const repository = new GardenRepository(window.localStorage, {
+  const repository = new GardenRepository(storage, {
     storageKey: 'lumen-garden:test-repository',
     now: () => 1_700_000_000_000,
     idFactory: (prefix) => `${prefix}-${++id}`,
   })
-  repository.clearDemoData()
+  if (clearDemoData) {
+    repository.clearDemoData()
+  }
   return repository
 }
 
@@ -158,5 +183,47 @@ describe('Lumen Garden navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Preview import' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Unexpected token')
+  })
+
+  it('withdraws a stale import preview when its source JSON changes', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    await user.click(screen.getByLabelText('Import JSON'))
+    await user.paste(repository.exportData())
+    await user.click(screen.getByRole('button', { name: 'Preview import' }))
+    expect(screen.getByRole('button', { name: 'Replace current garden' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Import JSON'), ' ')
+
+    expect(screen.queryByRole('button', { name: 'Replace current garden' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Preview cleared because the import JSON changed.')
+  })
+
+  it('keeps a failed capture visible and explains when local storage cannot save it', async () => {
+    const user = userEvent.setup()
+    const storage = new QuotaStorage()
+    const repository = createRepository(storage)
+    storage.failWrites = true
+    render(<App repository={repository} />)
+
+    await user.type(screen.getByLabelText('Idea fragment'), 'Do not lose this failed capture')
+    await user.click(screen.getByRole('button', { name: 'Capture' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not save/i)
+    expect(screen.getByLabelText('Idea fragment')).toHaveValue('Do not lose this failed capture')
+    expect(repository.getState().seeds).toEqual([])
+  })
+
+  it('explains how to preserve a recovery copy when existing local storage is malformed', () => {
+    const storage = new QuotaStorage()
+    storage.setItem('lumen-garden:test-repository', '{not valid JSON')
+    const repository = createRepository(storage, false)
+
+    render(<App repository={repository} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not read your previous local garden/i)
+    expect(screen.getByRole('button', { name: 'Export recovery copy' })).toBeInTheDocument()
   })
 })

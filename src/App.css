@@ -393,11 +393,37 @@ textarea:focus-visible,
 }
 
 .import-preview,
-.undo {
+.undo,
+.data-warning {
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.6rem;
   background: #f7f2e8;
+}
+
+.data-warning {
+  border-color: #b68442;
+  background: #fff7e9;
+  color: #62471e;
+}
+
+.data-warning h3,
+.data-warning p {
+  margin: 0;
+}
+
+.data-warning p {
+  margin-top: 0.35rem;
+}
+
+.data-warning button {
+  margin-top: 0.55rem;
+  border: 1px solid #8d682d;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  background: #fffdf9;
+  color: #513a16;
+  cursor: pointer;
 }
 
 .undo button,

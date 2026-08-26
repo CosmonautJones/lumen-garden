@@ -43,6 +43,12 @@ interface UndoEntry {
   createdAt: number
 }
 
+export interface StorageIssue {
+  kind: 'read' | 'write'
+  detail: string
+  recoveryAvailable: boolean
+}
+
 interface LegacyPayload {
   schemaVersion?: number
   version?: number
@@ -152,18 +158,26 @@ function normalizeSeedRaw(
   }
   const status = normalizeSeedStatus(data.status)
   const bedId = isSeedId(data.bedId) && bedIds.has(data.bedId as string) ? String(data.bedId) : undefined
-  return {
+  const normalized: Seed = {
     id: nextId(data.id, idFactory, 'seed'),
     text,
-    note: asText(data.note) || undefined,
     energy: normalizeEnergy(data.energy),
     tags: normalizeTags(data.tags ?? (typeof data.tagLine === 'string' ? data.tagLine.split(',') : data.labels)),
     status: status === 'active' && !bedId ? 'inbox' : status,
-    bedId,
     source: normalizeSeedSource(data.source ?? normalizeSeedSource(data.origin)),
     createdAt,
     updatedAt,
   }
+
+  const note = asText(data.note)
+  if (note) {
+    normalized.note = note
+  }
+  if (bedId) {
+    normalized.bedId = bedId
+  }
+
+  return normalized
 }
 
 function normalizeThreadRaw(
@@ -203,23 +217,33 @@ function normalizeFocusSessionRaw(
   const endedAt = data.endedAt === undefined ? undefined : normalizeTimestamp(data.endedAt, startedAt)
   const pausedAt = data.pausedAt === undefined ? undefined : normalizeTimestamp(data.pausedAt, now())
 
-  return {
+  const normalized: FocusSession = {
     id: nextId(data.id, idFactory, 'focus'),
     seedId: asText(data.seedId) || asText(data.seed),
     durationMinutes: normalizeDurationMinutes(data.durationMinutes ?? data.duration),
     status,
     startedAt,
-    pausedAt,
     accumulatedPauseMs:
       typeof data.accumulatedPauseMs === 'number' &&
       Number.isFinite(data.accumulatedPauseMs) &&
       data.accumulatedPauseMs > 0
         ? data.accumulatedPauseMs
         : 0,
-    outcome: asText(data.outcome) || undefined,
     previousSeedStatus: normalizeSeedStatus(data.previousSeedStatus),
-    endedAt,
   }
+
+  const outcome = asText(data.outcome)
+  if (outcome) {
+    normalized.outcome = outcome
+  }
+  if (pausedAt !== undefined) {
+    normalized.pausedAt = pausedAt
+  }
+  if (endedAt !== undefined) {
+    normalized.endedAt = endedAt
+  }
+
+  return normalized
 }
 
 function normalizeDurationMinutes(raw: unknown): number {
@@ -267,6 +291,26 @@ function assertUniqueIds(items: unknown[], label: string): Set<string> {
   return ids
 }
 
+function assertUniqueIdsAcrossCollections(collections: Array<[string, Set<string>]>): void {
+  const ids = new Set<string>()
+  for (const [label, collectionIds] of collections) {
+    for (const id of collectionIds) {
+      if (ids.has(id)) {
+        throw new Error(`Imported ${label} ids must be unique across collections`)
+      }
+      ids.add(id)
+    }
+  }
+}
+
+function isOneOf<T extends string>(value: unknown, values: readonly T[]): value is T {
+  return typeof value === 'string' && values.includes(value as T)
+}
+
+function isFiniteTimestamp(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
 function validateCurrentPayload(raw: LegacyPayload): void {
   const data = raw as Record<string, unknown>
   const beds = requiredCollection(data, 'beds')
@@ -281,19 +325,66 @@ function validateCurrentPayload(raw: LegacyPayload): void {
 
   const bedIds = assertUniqueIds(beds, 'bed')
   const seedIds = assertUniqueIds(seeds, 'seed')
-  assertUniqueIds(threads, 'thread')
-  assertUniqueIds(focusSessions, 'focus session')
+  const threadIds = assertUniqueIds(threads, 'thread')
+  const focusSessionIds = assertUniqueIds(focusSessions, 'focus session')
+  assertUniqueIdsAcrossCollections([
+    ['bed', bedIds],
+    ['seed', seedIds],
+    ['thread', threadIds],
+    ['focus session', focusSessionIds],
+  ])
+
+  if (!isFiniteTimestamp(meta.createdAt) || !isFiniteTimestamp(meta.updatedAt) || typeof meta.demoData !== 'boolean') {
+    throw new Error('Imported metadata is invalid')
+  }
+
+  for (const rawBed of beds) {
+    const bed = requiredRecord(rawBed, 'bed')
+    if (asText(bed.name).length === 0 || asText(bed.intent).length === 0) {
+      throw new Error('Imported bed must include a name and intent')
+    }
+    if (!isOneOf(bed.health, ['seedling', 'growing', 'blooming'])) {
+      throw new Error('Imported bed has an invalid health')
+    }
+    if (!isOneOf(bed.source, ['demo', 'user'])) {
+      throw new Error('Imported bed has an invalid source')
+    }
+    if (!isFiniteTimestamp(bed.createdAt) || !isFiniteTimestamp(bed.updatedAt)) {
+      throw new Error('Imported bed has invalid timestamps')
+    }
+  }
 
   for (const rawSeed of seeds) {
     const seed = requiredRecord(rawSeed, 'seed')
     if (asText(seed.text).length === 0) {
       throw new Error('Imported seed text must not be empty')
     }
+    if (!isOneOf(seed.status, ['inbox', 'active', 'focused', 'archived'])) {
+      throw new Error('Imported seed has an invalid seed status')
+    }
+    if (!isOneOf(seed.source, ['demo', 'user'])) {
+      throw new Error('Imported seed has an invalid source')
+    }
+    if (
+      typeof seed.energy !== 'number' ||
+      !Number.isInteger(seed.energy) ||
+      seed.energy < 1 ||
+      seed.energy > 5
+    ) {
+      throw new Error('Imported seed has an invalid energy')
+    }
+    if (!Array.isArray(seed.tags) || seed.tags.some((tag) => typeof tag !== 'string')) {
+      throw new Error('Imported seed has invalid tags')
+    }
+    if (!isFiniteTimestamp(seed.createdAt) || !isFiniteTimestamp(seed.updatedAt)) {
+      throw new Error('Imported seed has invalid timestamps')
+    }
     if (seed.bedId !== undefined && (!isSeedId(seed.bedId) || !bedIds.has(seed.bedId))) {
       throw new Error('Imported seed refers to a missing bed')
     }
   }
 
+  const threadRelationships = new Set<string>()
   for (const rawThread of threads) {
     const thread = requiredRecord(rawThread, 'thread')
     const fromSeedId = asText(thread.fromSeedId)
@@ -307,6 +398,14 @@ function validateCurrentPayload(raw: LegacyPayload): void {
     if (thread.relation !== 'supports' && thread.relation !== 'extends' && thread.relation !== 'blocks') {
       throw new Error('Imported thread has an invalid thread relation')
     }
+    if (!isFiniteTimestamp(thread.createdAt)) {
+      throw new Error('Imported thread has invalid timestamps')
+    }
+    const relationshipKey = [fromSeedId, toSeedId].sort().join(':')
+    if (threadRelationships.has(relationshipKey)) {
+      throw new Error('Imported garden has duplicate thread relationships')
+    }
+    threadRelationships.add(relationshipKey)
   }
 
   const activeSessionIds = new Set<string>()
@@ -315,6 +414,21 @@ function validateCurrentPayload(raw: LegacyPayload): void {
     const seedId = asText(session.seedId)
     if (!seedIds.has(seedId)) {
       throw new Error('Imported focus session refers to a missing seed')
+    }
+    if (!isOneOf(session.status, ['running', 'paused', 'completed', 'abandoned'])) {
+      throw new Error('Imported focus session has an invalid status')
+    }
+    if (!isOneOf(session.previousSeedStatus, ['inbox', 'active', 'focused', 'archived'])) {
+      throw new Error('Imported focus session has an invalid previous seed status')
+    }
+    if (
+      typeof session.durationMinutes !== 'number' ||
+      !Number.isInteger(session.durationMinutes) ||
+      session.durationMinutes < 1 ||
+      session.durationMinutes > 240 ||
+      !isFiniteTimestamp(session.startedAt)
+    ) {
+      throw new Error('Imported focus session is invalid')
     }
     if (session.status === 'running' || session.status === 'paused') {
       if (activeSessionIds.size > 0) {
@@ -439,6 +553,8 @@ export class GardenRepository {
   private state: GardenState
   private listeners = new Set<RepositoryListener>()
   private undoStack: UndoEntry[] = []
+  private malformedPayload: string | null = null
+  private storageIssue: StorageIssue | null = null
 
   constructor(storage: StorageLike, options: RepoOptions = {}) {
     this.storage = storage
@@ -476,6 +592,14 @@ export class GardenRepository {
       label: undo.label,
       createdAt: undo.createdAt,
     }
+  }
+
+  getStorageIssue(): StorageIssue | null {
+    return this.storageIssue ? { ...this.storageIssue } : null
+  }
+
+  getRecoveryData(): string | null {
+    return this.malformedPayload ?? this.storage.getItem(`${this.storageKey}:recovery`)
   }
 
   getAllBeds(): Bed[] {
@@ -519,13 +643,9 @@ export class GardenRepository {
         state.threads = next.threads
         state.focusSessions = next.focusSessions
         state.schemaVersion = next.schemaVersion
-        state.meta = {
-          ...next.meta,
-          demoData: false,
-          updatedAt: this.now(),
-        }
+        state.meta = cloneValue(next.meta)
       },
-      { label: 'Import replace', recordUndo: true },
+      { label: 'Import replace', recordUndo: true, touch: false },
     )
   }
 
@@ -534,13 +654,15 @@ export class GardenRepository {
   }
 
   undoLast(): boolean {
-    const latest = this.undoStack.shift()
+    const latest = this.undoStack[0]
     if (!latest) {
       return false
     }
-    this.state = cloneValue(latest.snapshot)
-    this.touch()
-    this.persist()
+
+    const restored = cloneValue(latest.snapshot)
+    this.persist(restored)
+    this.state = restored
+    this.undoStack.shift()
     this.emit()
     return true
   }
@@ -702,8 +824,10 @@ export class GardenRepository {
     const previousSeedStatus = seed.status
 
     this.commit((state) => {
-      const existing = this.getActiveFocusSession()
-      if (existing && existing.id !== seedId) {
+      const existing = state.focusSessions.find(
+        (session) => session.status === 'running' || session.status === 'paused',
+      )
+      if (existing && existing.seedId !== seedId) {
         existing.status = 'abandoned'
         existing.endedAt = this.now()
         const seedInFocus = state.seeds.find((item) => item.id === existing.seedId)
@@ -850,11 +974,16 @@ export class GardenRepository {
 
   private commit(
     action: (state: GardenState) => void,
-    options: { label?: string; recordUndo?: boolean } = {},
+    options: { label?: string; recordUndo?: boolean; touch?: boolean } = {},
   ): void {
     const before = cloneValue(this.state)
-    action(this.state)
-    this.touch()
+    const next = cloneValue(this.state)
+    action(next)
+    if (options.touch !== false) {
+      this.touch(next)
+    }
+    this.persist(next)
+    this.state = next
     if (options.recordUndo && options.label) {
       this.undoStack.unshift({
         id: this.idFactory('undo'),
@@ -866,13 +995,11 @@ export class GardenRepository {
         this.undoStack.splice(MAX_UNDO_ENTRIES)
       }
     }
-    this.persist()
-    this.state = cloneValue(this.state)
     this.emit()
   }
 
-  private touch(): void {
-    this.state.meta.updatedAt = this.now()
+  private touch(state: GardenState): void {
+    state.meta.updatedAt = this.now()
   }
 
   private emit(): void {
@@ -888,14 +1015,40 @@ export class GardenRepository {
     }
     try {
       const parsed = JSON.parse(rawValue)
-      return parsePayload(parsed, this.now, this.idFactory)
+      const state = parsePayload(parsed, this.now, this.idFactory)
+      const payload = asRecord(parsed)
+      if (payload && this.requiresMigration(payload as LegacyPayload)) {
+        try {
+          this.persist(state)
+        } catch (error) {
+          this.storageIssue = {
+            kind: 'write',
+            detail: error instanceof Error ? error.message : 'Unknown storage error',
+            recoveryAvailable: false,
+          }
+        }
+      }
+      return state
     } catch (error) {
-      console.error('Invalid persisted payload, resetting to fallback local state', error)
+      this.malformedPayload = rawValue
+      this.storageIssue = {
+        kind: 'read',
+        detail: error instanceof Error ? error.message : 'Unknown storage error',
+        recoveryAvailable: true,
+      }
       return createFallbackGarden(this.now)
     }
   }
 
-  private persist(): void {
-    this.storage.setItem(this.storageKey, this.exportData())
+  private requiresMigration(payload: LegacyPayload): boolean {
+    return getSchemaVersion(payload, CURRENT_SCHEMA_VERSION) !== CURRENT_SCHEMA_VERSION || !Array.isArray(payload.beds)
+  }
+
+  private persist(state: GardenState): void {
+    if (this.malformedPayload !== null) {
+      this.storage.setItem(`${this.storageKey}:recovery`, this.malformedPayload)
+    }
+    this.storage.setItem(this.storageKey, JSON.stringify(state, null, 2))
+    this.malformedPayload = null
   }
 }

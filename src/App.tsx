@@ -82,6 +82,8 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState('')
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [actionError, setActionError] = useState('')
+  const [dataNotice, setDataNotice] = useState('')
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const captureInputRef = useRef<HTMLInputElement>(null)
@@ -95,6 +97,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     () => repository.getSnapshot(),
   )
   const undo = repository.getUndoState()
+  const storageIssue = repository.getStorageIssue()
   const activeSession = repository.getActiveFocusSession()
   const activeSessionId = activeSession?.id
   const selectedSeed = useMemo(
@@ -194,7 +197,24 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     if (!window.confirm('Clear seeded demo data from your workspace?')) {
       return
     }
-    repository.clearDemoData()
+    runRepositoryAction(() => repository.clearDemoData())
+  }
+
+  function runRepositoryAction(action: () => void): boolean {
+    try {
+      action()
+      setActionError('')
+      return true
+    } catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      const isStorageFailure = /quota|storage|security/i.test(detail)
+      setActionError(
+        isStorageFailure
+          ? `Could not save this change locally. ${detail}. Your accepted garden is unchanged.`
+          : `Could not complete this change. ${detail}`,
+      )
+      return false
+    }
   }
 
   function handleCapture(event: FormEvent) {
@@ -206,12 +226,18 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       .map((tag) => tag.trim().toLowerCase())
       .filter((tag) => tag.length > 0)
 
-    repository.captureSeed({
-      text: captureText,
-      note: captureNote || undefined,
-      energy: captureEnergy,
-      tags,
+    const captured = runRepositoryAction(() => {
+      repository.captureSeed({
+        text: captureText,
+        note: captureNote || undefined,
+        energy: captureEnergy,
+        tags,
+      })
     })
+
+    if (!captured) {
+      return
+    }
 
     setCaptureText('')
     setCaptureNote('')
@@ -258,26 +284,37 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   }
 
   function handleArchive(seedId: string) {
-    repository.archiveSeed(seedId)
+    runRepositoryAction(() => repository.archiveSeed(seedId))
   }
 
   function handleRestore(seedId: string) {
-    repository.restoreSeed(seedId)
+    runRepositoryAction(() => repository.restoreSeed(seedId))
   }
 
   function handleMoveToBed(seedId: string, bedId: string) {
-    repository.moveSeedToBed(seedId, bedId)
+    runRepositoryAction(() => repository.moveSeedToBed(seedId, bedId))
   }
 
   function handleStartFocus(seedId: string) {
-    repository.startFocusSession(seedId, focusDuration)
-    setView('focus')
+    if (runRepositoryAction(() => repository.startFocusSession(seedId, focusDuration))) {
+      setView('focus')
+    }
   }
 
   function handleClearImportPreview() {
     setImportText('')
     setImportError('')
     setImportPreview(null)
+    setDataNotice('Import preview cleared.')
+  }
+
+  function handleImportTextChange(nextText: string) {
+    setImportText(nextText)
+    if (importPreview) {
+      setImportPreview(null)
+      setImportError('')
+      setDataNotice('Preview cleared because the import JSON changed.')
+    }
   }
 
   function handlePreviewImport() {
@@ -285,6 +322,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       const next = repository.previewImport(importText)
       setImportError('')
       setImportPreview(next)
+      setDataNotice('Import preview ready. Review the exact counts before replacing your garden.')
     } catch (error) {
       setImportError((error as Error).message)
       setImportPreview(null)
@@ -299,30 +337,47 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       repository.importData(importText)
       handleClearImportPreview()
     } catch (error) {
-      setImportError((error as Error).message)
+      setImportError(`Import was not applied. ${(error as Error).message} Your current garden is unchanged.`)
     }
   }
 
-  function handleExport() {
-    const payload = repository.exportData()
-    const blob = new Blob([payload], { type: 'application/json' })
+  function downloadFile(payload: string, fileName: string, mimeType = 'application/json') {
+    const blob = new Blob([payload], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'lumen-garden-export.json'
+    link.download = fileName
     link.click()
     URL.revokeObjectURL(url)
+  }
+
+  function handleExport() {
+    runRepositoryAction(() => downloadFile(repository.exportData(), 'lumen-garden-export.json'))
+  }
+
+  function handleExportRecovery() {
+    const recovery = repository.getRecoveryData()
+    if (!recovery) {
+      setActionError('A recovery copy is not available in this browser.')
+      return
+    }
+    runRepositoryAction(() => downloadFile(recovery, 'lumen-garden-recovery.json', 'text/plain'))
   }
 
   function handleCreateBed(event: FormEvent) {
     event.preventDefault()
     if (newBedName.trim().length === 0) return
-    repository.createBed({
-      name: newBedName,
-      intent: newBedIntent || 'No intent yet',
-      color: newBedColor,
-      health: newBedHealth,
+    const created = runRepositoryAction(() => {
+      repository.createBed({
+        name: newBedName,
+        intent: newBedIntent || 'No intent yet',
+        color: newBedColor,
+        health: newBedHealth,
+      })
     })
+    if (!created) {
+      return
+    }
     setNewBedName('')
     setNewBedIntent('')
   }
@@ -482,7 +537,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                             <span>{relationLabel(thread.relation)}</span>
                             <button
                               type="button"
-                              onClick={() => repository.removeThread(thread.id)}
+                              onClick={() => runRepositoryAction(() => repository.removeThread(thread.id))}
                               aria-label="Delete thread"
                             >
                               Remove
@@ -500,8 +555,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                     if (!threadTargetId || threadTargetId === selectedSeed.id) {
                       return
                     }
-                    repository.addThread(selectedSeed.id, threadTargetId, threadRelation)
-                    setThreadTargetId('')
+                    if (runRepositoryAction(() => repository.addThread(selectedSeed.id, threadTargetId, threadRelation))) {
+                      setThreadTargetId('')
+                    }
                   }}
                 >
                   <h4>Connect selected</h4>
@@ -566,22 +622,22 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               id="focus-outcome"
               rows={5}
               value={activeSession.outcome ?? ''}
-              onChange={(event) => repository.setFocusOutcome(activeSession.id, event.target.value)}
+              onChange={(event) => runRepositoryAction(() => repository.setFocusOutcome(activeSession.id, event.target.value))}
             />
             <div className="seed-actions">
               {activeSession.status === 'running' ? (
-                <button type="button" onClick={() => repository.pauseFocusSession(activeSession.id)}>
+                <button type="button" onClick={() => runRepositoryAction(() => repository.pauseFocusSession(activeSession.id))}>
                   Pause
                 </button>
               ) : (
-                <button type="button" onClick={() => repository.resumeFocusSession(activeSession.id)}>
+                <button type="button" onClick={() => runRepositoryAction(() => repository.resumeFocusSession(activeSession.id))}>
                   Resume
                 </button>
               )}
-              <button type="button" onClick={() => repository.completeFocusSession(activeSession.id)}>
+              <button type="button" onClick={() => runRepositoryAction(() => repository.completeFocusSession(activeSession.id))}>
                 Complete
               </button>
-              <button type="button" onClick={() => repository.abandonFocusSession(activeSession.id)}>
+              <button type="button" onClick={() => runRepositoryAction(() => repository.abandonFocusSession(activeSession.id))}>
                 Abandon
               </button>
             </div>
@@ -632,8 +688,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 disabled={focusSeedId.length === 0}
                 onClick={() => {
                   if (focusSeedId.length > 0) {
-                    repository.startFocusSession(focusSeedId, focusDuration)
-                    setFocusSeedId('')
+                    if (runRepositoryAction(() => repository.startFocusSession(focusSeedId, focusDuration))) {
+                      setFocusSeedId('')
+                    }
                   }
                 }}
               >
@@ -828,7 +885,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             <textarea
               id="import-input"
               value={importText}
-              onChange={(event) => setImportText(event.target.value)}
+              onChange={(event) => handleImportTextChange(event.target.value)}
               rows={7}
               placeholder='Paste exported garden JSON and click "Preview"'
             />
@@ -841,7 +898,21 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               ) : null}
             </div>
           </form>
+          {storageIssue ? (
+            <section className="data-warning" role="alert">
+              <h3>{storageIssue.kind === 'read' ? 'Local data needs recovery' : 'Local data was not saved'}</h3>
+              {storageIssue.kind === 'read' ? (
+                <p>Could not read your previous local garden. Its original bytes are preserved until you export a recovery copy.</p>
+              ) : (
+                <p>Could not save the latest local change. Export the accepted garden before trying again.</p>
+              )}
+              {storageIssue.recoveryAvailable ? (
+                <button type="button" onClick={handleExportRecovery}>Export recovery copy</button>
+              ) : null}
+            </section>
+          ) : null}
           {importError ? <p className="error" role="alert">{importError}</p> : null}
+          {actionError ? <p className="error" role="alert">{actionError}</p> : null}
           {importPreview ? (
             <section className="import-preview">
               <h3>Import preview</h3>
@@ -861,7 +932,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    repository.undoLast()
+                    runRepositoryAction(() => repository.undoLast())
                   }}
                 >
                   Undo
@@ -947,7 +1018,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               Keyboard: C capture, 1-4 switch views
             </p>
           </header>
-          <p className="sr-only" role="status">{workspaceMode}: {workspaceName}</p>
+          <p className="sr-only" role="status">{workspaceMode}: {workspaceName}{dataNotice ? `. ${dataNotice}` : ''}</p>
           {view === 'inbox'
             ? renderInbox()
             : view === 'explore'

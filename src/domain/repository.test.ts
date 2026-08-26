@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { CURRENT_SCHEMA_VERSION } from './model'
+import { CURRENT_SCHEMA_VERSION, STORAGE_KEY } from './model'
 import { GardenRepository } from './repository'
 
 class MemoryStorage {
   private readonly values = new Map<string, string>()
+  failWrites = false
 
   getItem(key: string): string | null {
     return this.values.get(key) ?? null
   }
 
   setItem(key: string, value: string): void {
+    if (this.failWrites) {
+      throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+    }
     this.values.set(key, value)
   }
 
@@ -134,6 +138,28 @@ describe('GardenRepository', () => {
     ).toThrow(/thread refers to a missing seed/i)
   })
 
+  it('rejects imported thread relationships that duplicate an existing connection', () => {
+    const repository = createRepository()
+    const payload = JSON.parse(repository.exportData()) as {
+      threads: Array<{
+        id: string
+        fromSeedId: string
+        toSeedId: string
+        relation: string
+        createdAt: number
+      }>
+    }
+    const [existingThread] = payload.threads
+    payload.threads.push({
+      ...existingThread,
+      id: 'thread-duplicate',
+      fromSeedId: existingThread.toSeedId,
+      toSeedId: existingThread.fromSeedId,
+    })
+
+    expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/duplicate thread relationships/i)
+  })
+
   it('rejects an import with an unsupported thread relation instead of normalizing it', () => {
     const repository = createRepository()
     const payload = JSON.parse(repository.exportData()) as {
@@ -197,5 +223,79 @@ describe('GardenRepository', () => {
         seeds: [expect.objectContaining({ id: 'legacy-seed', text: 'A legacy thought', bedId: 'legacy-bed' })],
       }),
     )
+
+    expect(JSON.parse(storage.getItem(STORAGE_KEY) ?? '')).toEqual(
+      expect.objectContaining({
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        beds: [expect.objectContaining({ id: 'legacy-bed', name: 'Legacy area' })],
+        seeds: [expect.objectContaining({ id: 'legacy-seed', text: 'A legacy thought' })],
+      }),
+    )
+  })
+
+  it('preserves a recovery copy before replacing malformed local storage', () => {
+    const storage = new MemoryStorage()
+    const malformedPayload = '{this is not valid JSON'
+    storage.setItem(STORAGE_KEY, malformedPayload)
+    const repository = createRepository(storage)
+
+    repository.captureSeed({ text: 'Start fresh without discarding recoverable bytes' })
+
+    expect(storage.getItem(`${STORAGE_KEY}:recovery`)).toBe(malformedPayload)
+  })
+
+  it('keeps the accepted garden and undo stack unchanged when a destructive write fails', () => {
+    const storage = new MemoryStorage()
+    const repository = createRepository(storage)
+    const beforeArchive = repository.getState()
+    const seedId = beforeArchive.seeds[0].id
+    storage.failWrites = true
+
+    expect(() => repository.archiveSeed(seedId)).toThrow(/quota exceeded/i)
+    expect(repository.getState()).toEqual(beforeArchive)
+    expect(repository.getUndoState()).toBeNull()
+  })
+
+  it('keeps an undo checkpoint available when restoring it cannot be persisted', () => {
+    const storage = new MemoryStorage()
+    const repository = createRepository(storage)
+    const seedId = repository.getState().seeds[0].id
+    repository.archiveSeed(seedId)
+    const archivedState = repository.getState()
+    storage.failWrites = true
+
+    expect(() => repository.undoLast()).toThrow(/quota exceeded/i)
+    expect(repository.getState()).toEqual(archivedState)
+    expect(repository.getUndoState()).toEqual(expect.objectContaining({ label: 'Archive seed' }))
+  })
+
+  it('round-trips exported gardens without changing accepted data', () => {
+    const source = createRepository()
+    const restored = createRepository(new MemoryStorage())
+
+    restored.importData(source.exportData())
+
+    expect(restored.getState()).toEqual(source.getState())
+  })
+
+  it('rejects current-schema imports with duplicate ids across entity collections', () => {
+    const repository = createRepository()
+    const payload = JSON.parse(repository.exportData()) as {
+      beds: Array<{ id: string }>
+      seeds: Array<{ id: string }>
+    }
+    payload.beds[0].id = payload.seeds[0].id
+
+    expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/ids must be unique across collections/i)
+  })
+
+  it('rejects invalid current-schema seed statuses instead of silently normalizing them', () => {
+    const repository = createRepository()
+    const payload = JSON.parse(repository.exportData()) as {
+      seeds: Array<{ status: string }>
+    }
+    payload.seeds[0].status = 'parked'
+
+    expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/invalid seed status/i)
   })
 })

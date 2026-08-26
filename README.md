@@ -66,7 +66,9 @@ The domain repository is intentionally separated from React presentation. It own
 
 - Your garden is stored in browser local storage on the current device.
 - Export creates a portable JSON representation of the current garden.
-- Import is parsed, schema-validated, previewed, and confirmed before it can replace current data. Unsupported future schema versions, missing collections, duplicate IDs, and dangling references are rejected.
+- Local writes are atomic: if browser storage is full or unavailable, the accepted garden and its undo checkpoint remain unchanged and the interface keeps the failed capture visible.
+- If saved data is malformed, Lumen Garden does not overwrite it blindly. The original bytes are retained as a recovery copy that can be exported before a new garden is saved.
+- Import is parsed, schema-validated, previewed, and confirmed before it can replace current data. Editing the JSON withdraws its preview, and unsupported future schema versions, missing collections, duplicate IDs, invalid values, and dangling or duplicate thread references are rejected.
 - Removing demo data, archiving, and relationship deletion are deliberate and reversible where supported.
 - Clearing browser storage removes the local garden. Export before clearing storage if you need a backup.
 
