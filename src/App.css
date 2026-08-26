@@ -83,6 +83,24 @@ nav {
   gap: 0.45rem;
 }
 
+.navigation-cluster {
+  display: grid;
+  gap: 1rem;
+}
+
+.navigation-label {
+  margin: 0 0 0.1rem;
+  color: #b8b5a8;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobile-primary-navigation {
+  display: none;
+}
+
 .rail h1 {
   margin: 0;
   font-family: var(--font-serif);
@@ -229,14 +247,12 @@ textarea {
   background: #373a31;
 }
 
-.seed-actions button:focus-visible,
-.rail button:focus-visible,
-.seed-select:focus-visible,
+button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 .thread-form button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -394,6 +410,30 @@ textarea:focus-visible,
   border-radius: 0.55rem;
   padding: 1rem;
   color: #736a5b;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.empty p {
+  margin: 0;
+}
+
+.empty-action {
+  width: max-content;
+  border: 1px solid var(--accent);
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  background: #e6f0ee;
+  color: #174c4f;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  border-color: #b9b2a6;
+  background: #e4e0d8;
+  color: #706d62;
 }
 
 .sr-only {
@@ -518,6 +558,52 @@ kbd {
     border-top: 1px solid #4b4b40;
   }
 
+  .navigation-cluster {
+    display: none;
+  }
+
+  .mobile-primary-navigation {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.7rem;
+    background: #f5f2ea;
+  }
+
+  .mobile-view-group {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .mobile-primary-navigation .navigation-label {
+    color: #5d5549;
+  }
+
+  .mobile-operate-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .mobile-primary-navigation button {
+    display: flex;
+    min-block-size: 2.75rem;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid var(--line);
+    border-radius: 0.45rem;
+    padding: 0.45rem 0.6rem;
+    background: #fffdf9;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .mobile-primary-navigation button.active {
+    border-color: var(--accent);
+    background: #dcebea;
+  }
+
   .main {
     order: 1;
   }
@@ -559,6 +645,16 @@ kbd {
   .capture-controls input:first-child,
   .capture-controls button {
     grid-column: 1 / -1;
+  }
+
+  button,
+  input,
+  select {
+    min-block-size: 2.75rem;
+  }
+
+  .mobile-operate-actions {
+    grid-template-columns: 1fr;
   }
 
   .workspace {

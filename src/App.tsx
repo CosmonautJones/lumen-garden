@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { relationLabel } from './domain/model'
 import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
@@ -85,6 +85,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const captureInputRef = useRef<HTMLInputElement>(null)
+  const commandCloseRef = useRef<HTMLButtonElement>(null)
+  const commandTriggerRef = useRef<HTMLButtonElement>(null)
+  const commandReturnFocusRef = useRef<HTMLElement | null>(null)
 
   const state = useSyncExternalStore(
     (listener) => repository.subscribe(listener),
@@ -98,6 +101,8 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     () => state.seeds.find((seed) => seed.id === selectedSeedId) ?? state.seeds[0] ?? null,
     [state.seeds, selectedSeedId],
   )
+  const workspaceMode = view === 'explore' ? 'Explore' : 'Operate'
+  const workspaceName = view === 'inbox' ? 'Inbox' : view === 'explore' ? 'Constellation' : view === 'focus' ? 'Focus' : 'Review'
 
   useEffect(() => {
     if (view === 'focus' && activeSessionId) {
@@ -110,21 +115,28 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   }, [view, activeSessionId])
 
   useEffect(() => {
+    if (isCommandPaletteOpen) {
+      commandCloseRef.current?.focus()
+    }
+  }, [isCommandPaletteOpen])
+
+  useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent): void => {
       if (event.defaultPrevented) return
       if (event.key === 'Escape' && isCommandPaletteOpen) {
-        setIsCommandPaletteOpen(false)
+        event.preventDefault()
+        closeCommandPalette()
         return
       }
       const target = event.target as HTMLElement
       const activeTag = target?.tagName?.toLowerCase()
-      const isTyping = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select'
+      const isTyping = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select' || target?.isContentEditable
       if (isTyping || event.metaKey || event.ctrlKey || event.altKey) {
         return
       }
       if (event.key === '?') {
         event.preventDefault()
-        setIsCommandPaletteOpen(true)
+        openCommandPalette()
         return
       }
       if ((event.key === 'c' || event.key === 'C') && captureInputRef.current) {
@@ -209,8 +221,40 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   }
 
   function focusCapture() {
-    setIsCommandPaletteOpen(false)
+    closeCommandPalette(false)
     captureInputRef.current?.focus()
+  }
+
+  function openCommandPalette() {
+    commandReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : commandTriggerRef.current
+    setIsCommandPaletteOpen(true)
+  }
+
+  function closeCommandPalette(restoreFocus = true) {
+    setIsCommandPaletteOpen(false)
+    if (restoreFocus) {
+      const focusTarget = commandReturnFocusRef.current ?? commandTriggerRef.current
+      focusTarget?.focus()
+    }
+  }
+
+  function handleCommandPaletteKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key !== 'Tab') return
+
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'))
+    if (buttons.length === 0) return
+
+    const firstButton = buttons[0]
+    const lastButton = buttons[buttons.length - 1]
+    if (event.shiftKey && document.activeElement === firstButton) {
+      event.preventDefault()
+      lastButton.focus()
+    } else if (!event.shiftKey && document.activeElement === lastButton) {
+      event.preventDefault()
+      firstButton.focus()
+    }
   }
 
   function handleArchive(seedId: string) {
@@ -283,6 +327,21 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     setNewBedIntent('')
   }
 
+  function renderViewButton(nextView: MainView, label: string, shortcut: string) {
+    return (
+      <button
+        type="button"
+        className={view === nextView ? 'active' : ''}
+        onClick={() => setView(nextView)}
+        aria-current={view === nextView ? 'page' : undefined}
+        aria-label={label}
+      >
+        <span>{label}</span>
+        <kbd aria-hidden="true">{shortcut}</kbd>
+      </button>
+    )
+  }
+
   function renderInbox() {
     return (
       <section className="pane" aria-label="Inbox">
@@ -292,6 +351,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
           <div className="empty">
             <p>The inbox is clear.</p>
             <p>Capture one seed to begin an operating cycle.</p>
+            <button type="button" className="empty-action" onClick={focusCapture}>
+              Capture a seed
+            </button>
           </div>
         ) : (
           <ul className="seed-list">
@@ -357,33 +419,44 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             <p className="helper">
               Select seeds to connect ideas and keep relation context visible.
             </p>
-            <ul className="seed-list seed-map">
-              {state.seeds.map((seed) => {
-                const bed = state.beds.find((current) => current.id === seed.bedId)
-                return (
-                  <li
-                    key={seed.id}
-                    className={`seed-card${selectedSeed?.id === seed.id ? ' selected' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="seed-select"
-                      onClick={() => setSelectedSeedId(seed.id)}
+            {state.seeds.length === 0 ? (
+              <div className="empty">
+                <p>Nothing is in this constellation yet.</p>
+                <p>Capture a seed, then return here to make a connection.</p>
+                <button type="button" className="empty-action" onClick={focusCapture}>
+                  Capture a seed
+                </button>
+              </div>
+            ) : (
+              <ul className="seed-list seed-map">
+                {state.seeds.map((seed) => {
+                  const bed = state.beds.find((current) => current.id === seed.bedId)
+                  return (
+                    <li
+                      key={seed.id}
+                      className={`seed-card${selectedSeed?.id === seed.id ? ' selected' : ''}`}
                     >
-                      <div className="seed-card-head">
-                        <h3>{seed.text}</h3>
-                        <span className="meta">
-                          {seed.status} · {seed.tags.join(', ') || 'no tags'}
-                        </span>
-                      </div>
-                      {bed ? (
-                        <small className="seed-meta">Bed: {bed.name}</small>
-                      ) : null}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+                      <button
+                        type="button"
+                        className="seed-select"
+                        onClick={() => setSelectedSeedId(seed.id)}
+                        aria-pressed={selectedSeed?.id === seed.id}
+                      >
+                        <div className="seed-card-head">
+                          <h3>{seed.text}</h3>
+                          <span className="meta">
+                            {seed.status} · {seed.tags.join(', ') || 'no tags'}
+                          </span>
+                        </div>
+                        {bed ? (
+                          <small className="seed-meta">Bed: {bed.name}</small>
+                        ) : null}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
           <aside className="inspector">
             {selectedSeed ? (
@@ -455,7 +528,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                     <option value="extends">extends</option>
                     <option value="blocks">blocks</option>
                   </select>
-                  <button type="submit">Add thread</button>
+                  <button type="submit" disabled={threadTargetId.length === 0}>Add thread</button>
                 </form>
               </section>
             ) : (
@@ -517,36 +590,46 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
           <article className="focus-card">
             <h3>Start focus</h3>
             <p className="helper">Pick one seed and choose a duration.</p>
-            <div className="focus-form">
-              <label htmlFor="focus-duration">Duration</label>
-              <select
-                id="focus-duration"
-                value={focusDuration}
-                onChange={(event) => setFocusDuration(Number(event.target.value))}
-              >
-                {DEFAULT_FOCUS_TEMPLATES.map((template) => (
-                  <option key={template.durationMinutes} value={template.durationMinutes}>
-                    {template.label}
-                  </option>
-                ))}
-              </select>
-              <label htmlFor="focus-seed">Seed</label>
-              <select
-                id="focus-seed"
-                value={focusSeedId}
-                onChange={(event) => setFocusSeedId(event.target.value)}
-              >
-                <option value="">Choose seed</option>
-                {candidates.map((seed) => (
-                  <option key={seed.id} value={seed.id}>
-                    {seed.text}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {candidates.length === 0 ? (
+              <div className="empty">
+                <p>Capture a seed to begin a focus session.</p>
+                <button type="button" className="empty-action" onClick={focusCapture}>
+                  Capture a seed
+                </button>
+              </div>
+            ) : (
+              <div className="focus-form">
+                <label htmlFor="focus-duration">Duration</label>
+                <select
+                  id="focus-duration"
+                  value={focusDuration}
+                  onChange={(event) => setFocusDuration(Number(event.target.value))}
+                >
+                  {DEFAULT_FOCUS_TEMPLATES.map((template) => (
+                    <option key={template.durationMinutes} value={template.durationMinutes}>
+                      {template.label}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="focus-seed">Seed</label>
+                <select
+                  id="focus-seed"
+                  value={focusSeedId}
+                  onChange={(event) => setFocusSeedId(event.target.value)}
+                >
+                  <option value="">Choose seed</option>
+                  {candidates.map((seed) => (
+                    <option key={seed.id} value={seed.id}>
+                      {seed.text}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="seed-actions">
               <button
                 type="button"
+                disabled={focusSeedId.length === 0}
                 onClick={() => {
                   if (focusSeedId.length > 0) {
                     repository.startFocusSession(focusSeedId, focusDuration)
@@ -652,40 +735,18 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       <aside className="rail">
         <h1>Lumen Garden</h1>
         <p className="helper">Operate your ideas, then explore constellations.</p>
-        <nav aria-label="Primary">
-          <button
-            type="button"
-            className={view === 'inbox' ? 'active' : ''}
-            onClick={() => setView('inbox')}
-          >
-            Inbox
-            <span className="nav-key">1</span>
-          </button>
-          <button
-            type="button"
-            className={view === 'explore' ? 'active' : ''}
-            onClick={() => setView('explore')}
-          >
-            Constellation
-            <span className="nav-key">2</span>
-          </button>
-          <button
-            type="button"
-            className={view === 'focus' ? 'active' : ''}
-            onClick={() => setView('focus')}
-          >
-            Focus
-            <span className="nav-key">3</span>
-          </button>
-          <button
-            type="button"
-            className={view === 'review' ? 'active' : ''}
-            onClick={() => setView('review')}
-          >
-            Review
-            <span className="nav-key">4</span>
-          </button>
-        </nav>
+        <div className="navigation-cluster">
+          <nav aria-label="Operate">
+            <p className="navigation-label">Operate</p>
+            {renderViewButton('inbox', 'Inbox', '1')}
+            {renderViewButton('focus', 'Focus', '3')}
+            {renderViewButton('review', 'Review', '4')}
+          </nav>
+          <nav aria-label="Explore">
+            <p className="navigation-label">Explore</p>
+            {renderViewButton('explore', 'Constellation', '2')}
+          </nav>
+        </div>
 
         <section className="rail-card">
           <h2>Beds</h2>
@@ -780,7 +841,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               ) : null}
             </div>
           </form>
-          {importError ? <p className="error">{importError}</p> : null}
+          {importError ? <p className="error" role="alert">{importError}</p> : null}
           {importPreview ? (
             <section className="import-preview">
               <h3>Import preview</h3>
@@ -856,28 +917,37 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
           <button
             type="button"
             className="command-trigger"
-            onClick={() => setIsCommandPaletteOpen(true)}
+            ref={commandTriggerRef}
+            onClick={openCommandPalette}
             aria-haspopup="dialog"
+            aria-expanded={isCommandPaletteOpen}
           >
             Commands <kbd>?</kbd>
           </button>
         </header>
+        <nav className="mobile-primary-navigation" aria-label="Primary views">
+          <div className="mobile-view-group">
+            <p className="navigation-label">Operate</p>
+            <div className="mobile-operate-actions">
+              {renderViewButton('inbox', 'Inbox', '1')}
+              {renderViewButton('focus', 'Focus', '3')}
+              {renderViewButton('review', 'Review', '4')}
+            </div>
+          </div>
+          <div className="mobile-view-group">
+            <p className="navigation-label">Explore</p>
+            {renderViewButton('explore', 'Constellation', '2')}
+          </div>
+        </nav>
 
         <div className="workspace">
           <header className="workspace-head">
-            <h2>
-              {view === 'inbox'
-                ? 'Inbox'
-                : view === 'explore'
-                  ? 'Explore'
-                  : view === 'focus'
-                    ? 'Focus'
-                    : 'Review'}
-            </h2>
+            <p className="eyebrow">{workspaceMode}</p>
             <p className="helper">
               Keyboard: C capture, 1-4 switch views
             </p>
           </header>
+          <p className="sr-only" role="status">{workspaceMode}: {workspaceName}</p>
           {view === 'inbox'
             ? renderInbox()
             : view === 'explore'
@@ -888,20 +958,21 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
         </div>
       </main>
       {isCommandPaletteOpen ? (
-        <div className="command-backdrop" onMouseDown={() => setIsCommandPaletteOpen(false)}>
+        <div className="command-backdrop" onMouseDown={() => closeCommandPalette()}>
           <section
             className="command-palette"
             role="dialog"
             aria-modal="true"
-            aria-label="Command menu"
+            aria-labelledby="command-menu-title"
             onMouseDown={(event) => event.stopPropagation()}
+            onKeyDown={handleCommandPaletteKeyDown}
           >
             <div className="command-palette-head">
               <div>
                 <p className="eyebrow">Keyboard command menu</p>
-                <h2>Choose the next move</h2>
+                <h2 id="command-menu-title">Command menu</h2>
               </div>
-              <button type="button" onClick={() => setIsCommandPaletteOpen(false)}>
+              <button ref={commandCloseRef} type="button" onClick={() => closeCommandPalette()} aria-label="Close command menu">
                 Close
               </button>
             </div>
@@ -910,19 +981,19 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 <span>Focus capture</span>
                 <kbd>C</kbd>
               </button>
-              <button type="button" onClick={() => { setView('inbox'); setIsCommandPaletteOpen(false) }}>
+              <button type="button" onClick={() => { setView('inbox'); closeCommandPalette() }}>
                 <span>Open inbox</span>
                 <kbd>1</kbd>
               </button>
-              <button type="button" onClick={() => { setView('explore'); setIsCommandPaletteOpen(false) }}>
+              <button type="button" onClick={() => { setView('explore'); closeCommandPalette() }}>
                 <span>Open constellation</span>
                 <kbd>2</kbd>
               </button>
-              <button type="button" onClick={() => { setView('focus'); setIsCommandPaletteOpen(false) }}>
+              <button type="button" onClick={() => { setView('focus'); closeCommandPalette() }}>
                 <span>Open focus</span>
                 <kbd>3</kbd>
               </button>
-              <button type="button" onClick={() => { setView('review'); setIsCommandPaletteOpen(false) }}>
+              <button type="button" onClick={() => { setView('review'); closeCommandPalette() }}>
                 <span>Open review</span>
                 <kbd>4</kbd>
               </button>

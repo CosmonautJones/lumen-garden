@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { GardenRepository } from './domain/repository'
@@ -28,7 +28,7 @@ describe('Lumen Garden navigation', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /constellation/i }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
 
     expect(screen.getByText('Select seeds to connect ideas and keep relation context visible.')).toBeInTheDocument()
   })
@@ -40,7 +40,7 @@ describe('Lumen Garden navigation', () => {
 
     await user.type(screen.getByLabelText('Idea fragment'), 'Turn field notes into a useful outline')
     await user.click(screen.getByRole('button', { name: 'Capture' }))
-    await user.click(screen.getByRole('button', { name: /^Focus3$/ }))
+    await user.click(within(screen.getByRole('navigation', { name: 'Operate' })).getByRole('button', { name: 'Focus' }))
 
     const seed = repository.getState().seeds[0]
     await user.selectOptions(screen.getByLabelText('Seed'), seed.id)
@@ -94,5 +94,69 @@ describe('Lumen Garden navigation', () => {
     expect(screen.getByLabelText('Optional note')).toBeInTheDocument()
     expect(screen.getByLabelText('Tags')).toBeInTheDocument()
     expect(screen.getByLabelText('Energy')).toBeInTheDocument()
+  })
+
+  it('separates operating views from exploration and announces the active workspace', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    expect(screen.getByRole('navigation', { name: 'Operate' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Explore' })).toBeInTheDocument()
+    const operateNavigation = screen.getByRole('navigation', { name: 'Operate' })
+    const exploreNavigation = screen.getByRole('navigation', { name: 'Explore' })
+    expect(within(operateNavigation).getByRole('button', { name: 'Inbox' })).toHaveAttribute('aria-current', 'page')
+
+    await user.click(within(exploreNavigation).getByRole('button', { name: 'Constellation' }))
+
+    expect(within(exploreNavigation).getByRole('button', { name: 'Constellation' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('status')).toHaveTextContent('Explore: Constellation')
+  })
+
+  it('moves focus into the command menu, keeps keyboard navigation inside it, and restores focus on close', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    const trigger = screen.getByRole('button', { name: /Commands/ })
+    await user.click(trigger)
+
+    const dialog = screen.getByRole('dialog', { name: 'Command menu' })
+    expect(screen.getByRole('button', { name: 'Close command menu' })).toHaveFocus()
+
+    await user.tab({ shift: true })
+    expect(screen.getByRole('button', { name: /Open review/ })).toHaveFocus()
+
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Close command menu' })).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Close command menu' }))
+    expect(dialog).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
+  it('offers a direct capture path when exploration and focus have no available seeds', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
+    expect(screen.getByText('Nothing is in this constellation yet.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Capture a seed' })).toBeInTheDocument()
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Operate' })).getByRole('button', { name: 'Focus' }))
+    expect(screen.getByText('Capture a seed to begin a focus session.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Begin' })).toBeDisabled()
+  })
+
+  it('announces import validation errors', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    await user.type(screen.getByLabelText('Import JSON'), 'not json')
+    await user.click(screen.getByRole('button', { name: 'Preview import' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Unexpected token')
   })
 })
