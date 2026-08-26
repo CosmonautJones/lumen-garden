@@ -1,12 +1,20 @@
 import {
-  Bed,
-  BedHealth,
-  BedInput,
   CURRENT_SCHEMA_VERSION,
+  STORAGE_KEY,
+  createDemoGarden,
+  createFallbackGarden,
+  normalizeBedHealth,
+  normalizeEnergy,
+  normalizeRelation,
+  normalizeSeedSource,
+  normalizeSeedStatus,
+  normalizeTags,
+} from './model'
+import type {
+  Bed,
+  BedInput,
   FocusSession,
   FocusStatus,
-  FocusStatus,
-  FocusSession,
   GardenMetadata,
   GardenState,
   ImportPreview,
@@ -14,17 +22,6 @@ import {
   Seed,
   SeedCaptureInput,
   SeedSource,
-  SeedStatus,
-  STORAGE_KEY,
-  createDemoGarden,
-  createFallbackGarden,
-  nowDateTime,
-  normalizeBedHealth,
-  normalizeEnergy,
-  normalizeRelation,
-  normalizeSeedSource,
-  normalizeSeedStatus,
-  normalizeTags,
 } from './model'
 
 const MAX_UNDO_ENTRIES = 12
@@ -96,11 +93,12 @@ function getSchemaVersion(raw: LegacyPayload, fallback = 1): number {
   return fallback
 }
 
-function normalizeTimestamp(value: unknown, now: () => number, fallback: number): number {
+function normalizeTimestamp(value: unknown, fallback: number): number {
   if (typeof value === 'number' && value > 0 && Number.isFinite(value)) {
     return value
   }
-  return now()
+
+  return fallback
 }
 
 function nextId(
@@ -121,8 +119,8 @@ function normalizeBedRaw(
   source: SeedSource,
 ): Bed {
   const data = asRecord(raw) ?? {}
-  const createdAt = normalizeTimestamp(data.createdAt, now, now())
-  const updatedAt = normalizeTimestamp(data.updatedAt, now, createdAt)
+  const createdAt = normalizeTimestamp(data.createdAt, now())
+  const updatedAt = normalizeTimestamp(data.updatedAt, createdAt)
   return {
     id: nextId(data.id, idFactory, 'bed'),
     name: asText(data.name) || asText(data.title) || 'Untitled bed',
@@ -142,8 +140,8 @@ function normalizeSeedRaw(
   idFactory: (prefix: string) => string,
 ): Seed {
   const data = asRecord(raw) ?? {}
-  const createdAt = normalizeTimestamp(data.createdAt, now, now())
-  const updatedAt = normalizeTimestamp(data.updatedAt, now, createdAt)
+  const createdAt = normalizeTimestamp(data.createdAt, now())
+  const updatedAt = normalizeTimestamp(data.updatedAt, createdAt)
   const text = asText(data.text) || asText(data.title) || asText(data.body)
   if (text.length === 0) {
     throw new Error('Seed text must not be empty')
@@ -183,7 +181,7 @@ function normalizeThreadRaw(
     fromSeedId,
     toSeedId,
     relation: normalizeRelation(data.relation || data.kind),
-    createdAt: normalizeTimestamp(data.createdAt, now, now()),
+    createdAt: normalizeTimestamp(data.createdAt, now()),
   }
 }
 
@@ -197,9 +195,10 @@ function normalizeFocusSessionRaw(
     ? (data.status as FocusStatus)
     : 'completed'
   const startRaw = data.startedAt
-  const startedAt = normalizeTimestamp(startRaw, now, now())
-  const endedAt = data.endedAt === undefined ? undefined : normalizeTimestamp(data.endedAt, now, startedAt)
-  const pausedAt = data.pausedAt === undefined ? undefined : normalizeTimestamp(data.pausedAt, now, now())
+  const startedAt = normalizeTimestamp(startRaw, now())
+  const endedAt = data.endedAt === undefined ? undefined : normalizeTimestamp(data.endedAt, startedAt)
+  const pausedAt = data.pausedAt === undefined ? undefined : normalizeTimestamp(data.pausedAt, now())
+
   return {
     id: nextId(data.id, idFactory, 'focus'),
     seedId: asText(data.seedId) || asText(data.seed),
@@ -207,7 +206,12 @@ function normalizeFocusSessionRaw(
     status,
     startedAt,
     pausedAt,
-    accumulatedPauseMs: normalizeDurationMinutes(data.accumulatedPauseMs) === 0 ? 0 : data.accumulatedPauseMs,
+    accumulatedPauseMs:
+      typeof data.accumulatedPauseMs === 'number' &&
+      Number.isFinite(data.accumulatedPauseMs) &&
+      data.accumulatedPauseMs > 0
+        ? data.accumulatedPauseMs
+        : 0,
     outcome: asText(data.outcome) || undefined,
     previousSeedStatus: normalizeSeedStatus(data.previousSeedStatus),
     endedAt,
@@ -246,9 +250,7 @@ function normalizeLegacyPayload(
   const seeds = asArray(raw.items).map((seed) =>
     normalizeSeedRaw(seed, now, bedIds, idFactory),
   )
-  const threadMap = asArray(raw.relations)
-    .map((thread) => normalizeThreadRaw(thread, now, idFactory))
-    .filter((thread) => bedIds.size > 0)
+  const threadMap = asArray(raw.relations).map((thread) => normalizeThreadRaw(thread, now, idFactory))
   const validSeedIds = new Set(seeds.map((seed) => seed.id))
   const threads = threadMap.filter(
     (thread) => validSeedIds.has(thread.fromSeedId) && validSeedIds.has(thread.toSeedId),
@@ -297,8 +299,9 @@ function normalizeCurrentPayload(
     threads,
     focusSessions,
     meta: {
-      createdAt: normalizeTimestamp(metaSource.createdAt, now, now()),
-      updatedAt: normalizeTimestamp(metaSource.updatedAt, now, now()),
+
+      createdAt: normalizeTimestamp(metaSource.createdAt, now()),
+      updatedAt: normalizeTimestamp(metaSource.updatedAt, now()),
       demoData: Boolean(metaSource.demoData),
     },
   }
@@ -397,6 +400,7 @@ export class GardenRepository {
       beds: next.beds.length,
       threads: next.threads.length,
       focusSessions: next.focusSessions.length,
+
     }
   }
 
@@ -496,6 +500,7 @@ export class GardenRepository {
       { label: 'Archive seed', recordUndo: true },
     )
   }
+
 
   restoreSeed(seedId: string): void {
     this.commit((state) => {
@@ -597,6 +602,7 @@ export class GardenRepository {
         const seedInFocus = state.seeds.find((item) => item.id === existing.seedId)
         if (seedInFocus) {
           seedInFocus.status = seedInFocus.status === 'archived' ? 'archived' : 'active'
+
         }
       }
 
@@ -616,7 +622,7 @@ export class GardenRepository {
         previousSeedStatus: activeSeed.status === 'focused' ? 'active' : activeSeed.status,
       }
       state.focusSessions.unshift(session)
-      state.meta.lastFocusSessionId = session.id
+
     })
   }
 
@@ -697,6 +703,7 @@ export class GardenRepository {
       }
       if (session.status === 'completed' || session.status === 'abandoned') {
         return
+
       }
       if (session.status === 'paused' && typeof session.pausedAt === 'number') {
         session.accumulatedPauseMs += now - session.pausedAt

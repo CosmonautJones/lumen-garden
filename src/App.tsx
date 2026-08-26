@@ -1,13 +1,7 @@
-import { FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import {
-  BedHealth,
-  FocusSession,
-  ImportPreview,
-  RelationType,
-  relationLabel,
-  Seed,
-  SeedStatus,
-} from './domain/model'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
+import { relationLabel } from './domain/model'
+import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
 import './App.css'
 
@@ -29,11 +23,6 @@ const RECENCY_OPTIONS = ['all', '7', '30', '90'] as const
 
 type RecencyFilter = (typeof RECENCY_OPTIONS)[number]
 
-const DEMO_RECOLOR: Record<string, string> = {
-  seedling: '#f6efe6',
-  growing: '#f4f1ea',
-  blooming: '#efe6d7',
-}
 
 const REPOSITORY = new GardenRepository(globalThis?.localStorage, {
   storageKey: 'lumen-garden:local-repository',
@@ -170,7 +159,7 @@ function App() {
   }, [])
 
   const inboxSeeds = useMemo(() => state.seeds.filter((seed) => seed.status === 'inbox'), [state.seeds])
-  const activeSeeds = useMemo(() => state.seeds.filter((seed) => seed.status === 'active'), [state.seeds])
+
   const selectedSeed = useMemo(() => state.seeds.find((seed) => seed.id === selectedSeedId) ?? null, [state.seeds, selectedSeedId])
   const bedOptions = useMemo(() => state.beds.slice().sort(byRecent), [state.beds])
 
@@ -659,8 +648,6 @@ function App() {
 
   const bedsById = useMemo(() => groupBy(state.beds, (bed) => bed.id), [state.beds])
   const selectedColor = selectedSeed ? bedsById[selectedSeed.bedId ?? '']?.[0]?.color ?? '#3a3a3a' : '#3a3a3a'
-  const bedColorClass =
-    selectedSeed?.bedId && bedOptions.find((bed) => bed.id === selectedSeed.bedId)?.color
 
   return (
     <div className="app-shell">
@@ -711,7 +698,7 @@ function App() {
               {bedOptions.map((bed) => (
                 <li key={bed.id}>
                   <button type="button" className="bed-item">
-                    <span className="bed-swatch" style={{ '--bed-color': bed.color }} />
+                    <span className="bed-swatch" style={{ '--bed-color': bed.color } as CSSProperties} />
                     <span>{bed.name}</span>
                   </button>
                 </li>
@@ -865,12 +852,12 @@ function App() {
           className="workspace"
           style={
             selectedSeed
-              ? {
+              ? ({
                   '--work-color':
                     bedsById[selectedSeed.bedId ?? '']?.[0]?.color ??
                     selectedColor,
                   '--paper-hue': selectedColor ? '#f8f4ee' : '#f6f2eb',
-                }
+                } as CSSProperties)
               : undefined
           }
         >
