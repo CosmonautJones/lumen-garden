@@ -11,7 +11,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / ".autonomous-build.log"
 DEADLINE_HOURS = float(os.environ.get("LUMEN_BUILD_HOURS", "8"))
-CODER_MODEL = os.environ.get("LUMEN_CODEx_MODEL", "gpt-5.3-codex-spark")
+CODER_MODEL = os.environ.get("LUMEN_CODEx_MODEL", "gpt-5.6-terra")
 PASS_TIMEOUT_SECONDS = int(os.environ.get("LUMEN_PASS_TIMEOUT_SECONDS", "600"))
 
 PASSES = [
