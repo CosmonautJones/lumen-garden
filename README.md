@@ -13,7 +13,7 @@ Most idea tools optimize for collecting more. Lumen Garden optimizes for **retur
 - **Inbox** — capture a seed in seconds, then triage it into a bed, archive it, or start focus.
 - **Constellation** — inspect seeds and their explicit relationships without losing context.
 - **Focus** — work one calm, interruption-safe block with an outcome, timer, pause/resume, and completion history.
-- **Review** — filter the garden by status, bed, tag, and recency.
+- **Review** — filter the garden by status, bed, tag, and recency, with one transparent recommendation for what to tend next.
 - **Local data controls** — preview imports before replacement, export JSON, remove demo data, and undo destructive actions.
 
 ## Quick start
@@ -61,6 +61,8 @@ src/
 ```
 
 The domain repository is intentionally separated from React presentation. It owns persistence, schema validation, migrations, referential integrity, and reversible destructive actions. React subscribes through a stable external-store snapshot so the interface is responsive without leaking mutable state into view logic.
+
+Review keeps prioritization inspectable: active seeds come before inbox seeds; within either state, higher-energy work comes first, then the seed that has waited the longest. The recommendation is a shortcut into a focus block, not a hidden scheduler.
 
 ## Data and privacy
 

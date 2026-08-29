@@ -162,6 +162,32 @@ export function relationLabel(relation: RelationType): string {
   return RELATION_LABELS[relation]
 }
 
+/**
+ * Chooses one concrete seed to tend without hiding the rest of the garden.
+ * Active work takes precedence; within the same state, energy breaks ties
+ * before the least-recently-touched seed keeps long-lived work visible.
+ */
+export function selectNextSeed(seeds: readonly Seed[]): Seed | null {
+  const candidates = seeds.filter((seed) => seed.status === 'active' || seed.status === 'inbox')
+  if (candidates.length === 0) {
+    return null
+  }
+
+  return candidates.slice().sort((left, right) => {
+    const statusPriority = Number(right.status === 'active') - Number(left.status === 'active')
+    if (statusPriority !== 0) {
+      return statusPriority
+    }
+
+    const energyPriority = right.energy - left.energy
+    if (energyPriority !== 0) {
+      return energyPriority
+    }
+
+    return left.updatedAt - right.updatedAt
+  })[0]
+}
+
 export function nowDateTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }

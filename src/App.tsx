@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { relationLabel } from './domain/model'
+import { relationLabel, selectNextSeed } from './domain/model'
 import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
 import './App.css'
@@ -180,6 +180,8 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       .filter((seed) => (filterRecency === 'all' ? true : seed.updatedAt >= cutoffMs))
       .sort(byRecent)
   }, [filterBed, filterRecency, filterStatus, filterTag, nowTick, state.seeds])
+
+  const nextSeed = useMemo(() => selectNextSeed(state.seeds), [state.seeds])
 
   const activeThreads = useMemo(() => {
     if (!selectedSeed) return []
@@ -707,6 +709,27 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     return (
       <section className="pane" aria-label="Review">
         <h2>Review</h2>
+        {nextSeed ? (
+          <section className="next-action" aria-labelledby="next-action-heading">
+            <div>
+              <p className="eyebrow">One concrete next action</p>
+              <h3 id="next-action-heading">Next to tend</h3>
+              <p className="next-action-seed">{nextSeed.text}</p>
+              <p className="helper">
+                {nextSeed.status === 'active' ? 'Active work is ready to move.' : 'Your inbox is ready for its first pass.'}{' '}
+                Energy {nextSeed.energy}/5.
+              </p>
+            </div>
+            <button type="button" className="next-action-button" onClick={() => handleStartFocus(nextSeed.id)}>
+              Start a focus block
+            </button>
+          </section>
+        ) : (
+          <div className="empty">
+            <p>No available seed needs attention right now.</p>
+            <p>Finish the current focus block or capture a fresh idea when it arrives.</p>
+          </div>
+        )}
         <div className="filters">
           <label>
             Status

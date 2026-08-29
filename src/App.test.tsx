@@ -99,6 +99,31 @@ describe('Lumen Garden navigation', () => {
     expect(screen.getByLabelText('Bed')).toHaveValue(bed.id)
   })
 
+  it('recommends one actionable seed in review and starts focus from that recommendation', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    const bed = repository.createBed({
+      name: 'Portfolio',
+      intent: 'Ship the strongest proof of work',
+      color: '#2f8f94',
+    })
+    const inboxSeed = repository.captureSeed({ text: 'Collect screenshots', energy: 5 })
+    const activeSeed = repository.captureSeed({ text: 'Write a credible case study', energy: 4 })
+    repository.moveSeedToBed(activeSeed.id, bed.id)
+    expect(repository.getSeed(inboxSeed.id)).toEqual(expect.objectContaining({ status: 'inbox' }))
+
+    render(<App repository={repository} />)
+    await user.click(within(screen.getByRole('navigation', { name: 'Operate' })).getByRole('button', { name: 'Review' }))
+
+    const recommendation = screen.getByRole('heading', { name: 'Next to tend' }).closest('section')
+    expect(recommendation).not.toBeNull()
+    expect(within(recommendation!).getByText('Write a credible case study')).toBeInTheDocument()
+    await user.click(within(recommendation!).getByRole('button', { name: 'Start a focus block' }))
+
+    expect(screen.getByRole('heading', { name: 'Active session' })).toBeInTheDocument()
+    expect(repository.getActiveFocusSession()).toEqual(expect.objectContaining({ seedId: activeSeed.id }))
+  })
+
   it('opens the keyboard command menu and returns focus to capture', async () => {
     const user = userEvent.setup()
     const repository = createRepository()
