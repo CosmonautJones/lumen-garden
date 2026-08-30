@@ -60,6 +60,28 @@ function byRecent(a: { updatedAt: number }, b: { updatedAt: number }): number {
   return b.updatedAt - a.updatedAt
 }
 
+type ConstellationPoint = { x: number; y: number }
+
+const CONSTELLATION_POINTS: readonly ConstellationPoint[] = [
+  { x: 14, y: 23 },
+  { x: 42, y: 15 },
+  { x: 75, y: 25 },
+  { x: 21, y: 72 },
+  { x: 51, y: 76 },
+  { x: 80, y: 68 },
+]
+
+function getConstellationPoint(index: number, total: number): ConstellationPoint {
+  const stored = CONSTELLATION_POINTS[index]
+  if (stored) return stored
+
+  const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
+  return {
+    x: 50 + Math.cos(angle) * 34,
+    y: 50 + Math.sin(angle) * 34,
+  }
+}
+
 function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   const [view, setView] = useState<MainView>('inbox')
   const [captureText, setCaptureText] = useState('')
@@ -468,6 +490,15 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   }
 
   function renderExplore() {
+    const visibleThreads = state.threads.filter(
+      (thread) =>
+        state.seeds.some((seed) => seed.id === thread.fromSeedId) &&
+        state.seeds.some((seed) => seed.id === thread.toSeedId),
+    )
+    const pointsBySeedId = new Map(
+      state.seeds.map((seed, index) => [seed.id, getConstellationPoint(index, state.seeds.length)]),
+    )
+
     return (
       <section className="pane" aria-label="Constellation">
         <div className="two-column">
@@ -485,34 +516,76 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 </button>
               </div>
             ) : (
-              <ul className="seed-list seed-map">
-                {state.seeds.map((seed) => {
-                  const bed = state.beds.find((current) => current.id === seed.bedId)
-                  return (
-                    <li
-                      key={seed.id}
-                      className={`seed-card${selectedSeed?.id === seed.id ? ' selected' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className="seed-select"
-                        onClick={() => setSelectedSeedId(seed.id)}
-                        aria-pressed={selectedSeed?.id === seed.id}
-                      >
-                        <div className="seed-card-head">
-                          <h3>{seed.text}</h3>
-                          <span className="meta">
-                            {seed.status} · {seed.tags.join(', ') || 'no tags'}
-                          </span>
-                        </div>
-                        {bed ? (
-                          <small className="seed-meta">Bed: {bed.name}</small>
-                        ) : null}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              <section className="constellation-map" aria-label="Constellation map">
+                <header className="constellation-map-head">
+                  <p className="eyebrow">Idea field</p>
+                  <p className="constellation-count">
+                    {visibleThreads.length} visible {visibleThreads.length === 1 ? 'thread' : 'threads'}
+                  </p>
+                </header>
+                <div className="constellation-canvas" role="group" aria-label="Constellation canvas">
+                  <svg className="constellation-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    {visibleThreads.map((thread) => {
+                      const from = pointsBySeedId.get(thread.fromSeedId)
+                      const to = pointsBySeedId.get(thread.toSeedId)
+                      if (!from || !to) return null
+                      return <line key={thread.id} className={`constellation-line ${thread.relation}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+                    })}
+                  </svg>
+                  <ul className="seed-list seed-map">
+                    {state.seeds.map((seed, index) => {
+                      const bed = state.beds.find((current) => current.id === seed.bedId)
+                      const threadCount = visibleThreads.filter(
+                        (thread) => thread.fromSeedId === seed.id || thread.toSeedId === seed.id,
+                      ).length
+                      const point = getConstellationPoint(index, state.seeds.length)
+                      return (
+                        <li
+                          key={seed.id}
+                          className={`seed-card constellation-node${selectedSeed?.id === seed.id ? ' selected' : ''}`}
+                          style={{ '--node-x': `${point.x}%`, '--node-y': `${point.y}%` } as CSSProperties}
+                        >
+                          <button
+                            type="button"
+                            className="seed-select"
+                            onClick={() => setSelectedSeedId(seed.id)}
+                            aria-pressed={selectedSeed?.id === seed.id}
+                          >
+                            <span className="constellation-node-mark" aria-hidden="true" />
+                            <div className="seed-card-head">
+                              <h3>{seed.text}</h3>
+                              <span className="meta">
+                                {seed.status} · {seed.tags.join(', ') || 'no tags'}
+                              </span>
+                            </div>
+                            <div className="constellation-node-footer">
+                              {bed ? <small className="seed-meta">{bed.name}</small> : <small className="seed-meta">Unsorted</small>}
+                              <small className="thread-count">{threadCount} {threadCount === 1 ? 'link' : 'links'}</small>
+                            </div>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+                {visibleThreads.length > 0 ? (
+                  <ul className="constellation-threads" aria-label="Threads in this constellation">
+                    {visibleThreads.map((thread) => {
+                      const from = state.seeds.find((seed) => seed.id === thread.fromSeedId)
+                      const to = state.seeds.find((seed) => seed.id === thread.toSeedId)
+                      return (
+                        <li key={thread.id}>
+                          <span>{from?.text ?? 'Unknown seed'}</span>
+                          <span className={`relation-chip ${thread.relation}`}>{relationLabel(thread.relation)}</span>
+                          <span>{to?.text ?? 'Unknown seed'}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="constellation-prompt">Select a seed, then add its first thread in the field notes.</p>
+                )}
+              </section>
             )}
           </div>
           <aside className="inspector">
@@ -1041,6 +1114,30 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               Keyboard: C capture, 1-4 switch views
             </p>
           </header>
+          <section className="workflow-guide" aria-label="How this garden works">
+            <div className="workflow-guide-intro">
+              <p className="eyebrow">A practice, not a pile</p>
+              <h2>Give each useful fragment a place to go next.</h2>
+            </div>
+            <ol>
+              <li>
+                <span>01</span>
+                <p>Capture a fragment before it disappears.</p>
+              </li>
+              <li>
+                <span>02</span>
+                <p>Connect it when another idea gives it context.</p>
+              </li>
+              <li>
+                <span>03</span>
+                <p>Choose one seed for a focused block.</p>
+              </li>
+              <li>
+                <span>04</span>
+                <p>Review the garden and decide what deserves attention next.</p>
+              </li>
+            </ol>
+          </section>
           <p className="sr-only" role="status">{workspaceMode}: {workspaceName}{dataNotice ? `. ${dataNotice}` : ''}</p>
           {view === 'inbox'
             ? renderInbox()

@@ -199,10 +199,10 @@ export function createDemoGarden(
   const seedSource: SeedSource = 'demo'
   const createdAt = now()
 
-  const designBed: Bed = {
+  const productBed: Bed = {
     id: nextId('bed'),
-    name: 'Design',
-    intent: 'Shape ideas into prototypes and improve clarity',
+    name: 'Product',
+    intent: 'Turn the idea greenhouse into a useful local tool',
     color: '#2f8f94',
     health: 'growing',
     source: seedSource,
@@ -210,10 +210,10 @@ export function createDemoGarden(
     updatedAt: createdAt,
   }
 
-  const systemsBed: Bed = {
+  const researchBed: Bed = {
     id: nextId('bed'),
-    name: 'Systems',
-    intent: 'Convert proposals into reliable workflows',
+    name: 'Research',
+    intent: 'Learn what makes a fragment worth returning to',
     color: '#d4ac47',
     health: 'seedling',
     source: seedSource,
@@ -221,54 +221,134 @@ export function createDemoGarden(
     updatedAt: createdAt,
   }
 
-  const firstSeed: Seed = {
-    id: nextId('seed'),
-    text: 'Capture one idea, then pick one concrete next action',
-    note: 'This is the shortest possible way to move an idea from thought to momentum.',
-    energy: 4,
-    tags: ['capture', 'workflow'],
-    status: 'inbox',
+  const practiceBed: Bed = {
+    id: nextId('bed'),
+    name: 'Practice',
+    intent: 'Build a calmer rhythm for capture, focus, and review',
+    color: '#ce6f67',
+    health: 'growing',
     source: seedSource,
     createdAt,
     updatedAt: createdAt,
   }
 
-  const secondSeed: Seed = {
+  const researchSeed: Seed = {
     id: nextId('seed'),
-    text: 'Draft a one-week review process for what actually ships',
-    note: 'Focus on outcomes, not output.',
-    energy: 3,
-    tags: ['review', 'execution'],
+    text: 'Ask five people why useful notes go stale',
+    note: 'Look for the moment a promising fragment loses its context or its next action.',
+    energy: 4,
+    tags: ['research', 'interviews'],
     status: 'inbox',
+    bedId: researchBed.id,
+    source: seedSource,
+    createdAt,
+    updatedAt: createdAt,
+  }
+
+  const constellationSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Connect fragments through explicit relationships',
+    note: 'The constellation should reveal a useful trail without hiding the original notes.',
+    energy: 5,
+    tags: ['constellation', 'product'],
+    status: 'active',
+    bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 3_000,
     updatedAt: createdAt + 3_000,
   }
 
-  const thirdSeed: Seed = {
+  const releaseSeed: Seed = {
     id: nextId('seed'),
-    text: 'Draft a local persistence migration test plan',
-    note: 'No server means every edge case must be solved in the repository.',
+    text: 'Define the smallest useful Lumen Garden release',
+    note: 'Capture quickly, connect deliberately, focus once, and review without a server.',
     energy: 5,
-    tags: ['testing', 'data'],
+    tags: ['release', 'scope'],
     status: 'active',
-    bedId: systemsBed.id,
+    bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 6_000,
     updatedAt: createdAt + 6_000,
   }
 
+  const localDataSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Keep every garden local, exportable, and recoverable',
+    note: 'Local-first only works when the data controls earn trust.',
+    energy: 4,
+    tags: ['data', 'trust'],
+    status: 'active',
+    bedId: productBed.id,
+    source: seedSource,
+    createdAt: createdAt + 9_000,
+    updatedAt: createdAt + 9_000,
+  }
+
+  const reviewSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Run a weekly review that ends with one next action',
+    note: 'The review should make neglected work visible without turning into a reporting ritual.',
+    energy: 3,
+    tags: ['review', 'practice'],
+    status: 'active',
+    bedId: practiceBed.id,
+    source: seedSource,
+    createdAt: createdAt + 12_000,
+    updatedAt: createdAt + 12_000,
+  }
+
+  const onboardingSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Write the first-use walkthrough in the empty states',
+    note: 'The interface should teach capture, connection, and focus at the moment each becomes possible.',
+    energy: 2,
+    tags: ['onboarding', 'writing'],
+    status: 'inbox',
+    bedId: practiceBed.id,
+    source: seedSource,
+    createdAt: createdAt + 15_000,
+    updatedAt: createdAt + 15_000,
+  }
+
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    seeds: [firstSeed, secondSeed, thirdSeed],
-    beds: [designBed, systemsBed],
+    seeds: [researchSeed, constellationSeed, releaseSeed, localDataSeed, reviewSeed, onboardingSeed],
+    beds: [productBed, researchBed, practiceBed],
     threads: [
       {
         id: nextId('thread'),
-        fromSeedId: firstSeed.id,
-        toSeedId: thirdSeed.id,
+        fromSeedId: researchSeed.id,
+        toSeedId: constellationSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 18_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: constellationSeed.id,
+        toSeedId: releaseSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 21_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: releaseSeed.id,
+        toSeedId: localDataSeed.id,
         relation: 'extends',
-        createdAt: createdAt + 9_000,
+        createdAt: createdAt + 24_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: reviewSeed.id,
+        toSeedId: releaseSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 27_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: onboardingSeed.id,
+        toSeedId: releaseSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 30_000,
       },
     ],
     focusSessions: [],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectNextSeed } from './model'
+import { createDemoGarden, selectNextSeed } from './model'
 import type { Seed } from './model'
 
 function seed(overrides: Partial<Seed>): Seed {
@@ -44,5 +44,24 @@ describe('selectNextSeed', () => {
       seed({ status: 'archived' }),
       seed({ id: 'focused', status: 'focused' }),
     ])).toBeNull()
+  })
+})
+
+describe('createDemoGarden', () => {
+  it('seeds a connected product-work constellation instead of isolated placeholder ideas', () => {
+    let id = 0
+    const garden = createDemoGarden(
+      () => 1_700_000_000_000,
+      (prefix) => `${prefix}-${++id}`,
+    )
+
+    expect(garden.beds.map((bed) => bed.name)).toEqual(['Product', 'Research', 'Practice'])
+    expect(garden.seeds).toHaveLength(6)
+    expect(garden.threads).toHaveLength(5)
+    expect(garden.seeds.map((seed) => seed.text)).toContain('Define the smallest useful Lumen Garden release')
+    expect(garden.threads.every((thread) =>
+      garden.seeds.some((seed) => seed.id === thread.fromSeedId) &&
+      garden.seeds.some((seed) => seed.id === thread.toSeedId),
+    )).toBe(true)
   })
 })
