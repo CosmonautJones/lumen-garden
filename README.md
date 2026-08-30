@@ -4,6 +4,8 @@
 
 Lumen Garden is a local-only React workspace for capturing small ideas, tending them into project beds, connecting related work, and choosing one focused action at a time. It has no accounts, server, telemetry, analytics, or external data services.
 
+**Live demo:** https://cosmonautjones.github.io/lumen-garden/
+
 ## Why it exists
 
 Most idea tools optimize for collecting more. Lumen Garden optimizes for **returning to the useful fragment**: capture it quickly, give it context, connect it to adjacent work, and decide what to do next.
@@ -11,7 +13,7 @@ Most idea tools optimize for collecting more. Lumen Garden optimizes for **retur
 ## Product surface
 
 - **Inbox** — capture a seed in seconds, then triage it into a bed, archive it, or start focus.
-- **Constellation** — inspect seeds and their explicit relationships without losing context.
+- **Constellation** — inspect ideas as an accessible visual map: focusable seed nodes, explicit relationship lines, and a detail inspector.
 - **Focus** — work one calm, interruption-safe block with an outcome, timer, pause/resume, and completion history.
 - **Review** — filter the garden by status, bed, tag, and recency, with one transparent recommendation for what to tend next.
 - **Local data controls** — preview imports before replacement, export JSON, remove demo data, and undo destructive actions.
@@ -54,6 +56,7 @@ Keyboard shortcuts stay out of text fields and standard modified shortcuts remai
 src/
   domain/
     model.ts          Core types, normalization, seeded demo data
+    constellation.ts  Stable, bounded placement for the visual Explore map
     repository.ts     Versioned local repository, import/export, undo
     *.test.ts         Persistence and repository behavior tests
   App.tsx             Operate/Explore product surface
@@ -86,4 +89,4 @@ Use small, cohesive conventional commits. Keep domain behavior test-covered, pre
 
 ## License
 
-No license has been selected yet. All rights reserved until one is added.
+MIT. See [LICENSE](LICENSE).

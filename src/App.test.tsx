@@ -58,6 +58,19 @@ describe('Lumen Garden navigation', () => {
     expect(screen.getByText('Select seeds to connect ideas and keep relation context visible.')).toBeInTheDocument()
   })
 
+  it('renders connected seeds as keyboard-accessible constellation nodes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
+
+    const constellation = screen.getByRole('group', { name: 'Visual constellation' })
+    const seedNode = within(constellation).getByRole('button', { name: /Capture one idea/i })
+    expect(seedNode).toBeInTheDocument()
+    expect(within(constellation).getAllByRole('button', { pressed: true })).toHaveLength(1)
+    expect(within(constellation).getAllByRole('button')).toHaveLength(3)
+  })
+
   it('captures a seed and starts a focus session for the selected seed', async () => {
     const user = userEvent.setup()
     const repository = createRepository()

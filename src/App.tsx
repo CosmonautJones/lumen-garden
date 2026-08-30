@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { createConstellationLayout } from './domain/constellation'
 import { relationLabel, selectNextSeed } from './domain/model'
 import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
@@ -189,6 +190,12 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       (thread) => thread.fromSeedId === selectedSeed.id || thread.toSeedId === selectedSeed.id,
     )
   }, [selectedSeed, state.threads])
+
+  const constellationLayout = useMemo(() => createConstellationLayout(state.seeds), [state.seeds])
+  const constellationPositions = useMemo(
+    () => new Map(constellationLayout.map((node) => [node.seedId, node])),
+    [constellationLayout],
+  )
 
   const threadSeedOptions = useMemo(
     () => state.seeds.filter((seed) => seed.id !== selectedSeed?.id).sort((a, b) => a.text.localeCompare(b.text)),
@@ -485,34 +492,45 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 </button>
               </div>
             ) : (
-              <ul className="seed-list seed-map">
-                {state.seeds.map((seed) => {
+              <div className="constellation-canvas" role="group" aria-label="Visual constellation">
+                <p className="sr-only">Each seed is a button. Lines show explicit relationships between seeds.</p>
+                <svg className="constellation-threads" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                  {state.threads.map((thread) => {
+                    const from = constellationPositions.get(thread.fromSeedId)
+                    const to = constellationPositions.get(thread.toSeedId)
+                    if (!from || !to) return null
+                    return (
+                      <line
+                        key={thread.id}
+                        className={`constellation-thread relation-${thread.relation}`}
+                        x1={from.x}
+                        y1={from.y}
+                        x2={to.x}
+                        y2={to.y}
+                      />
+                    )
+                  })}
+                </svg>
+                {constellationLayout.map((node) => {
+                  const seed = state.seeds.find((item) => item.id === node.seedId)
+                  if (!seed) return null
                   const bed = state.beds.find((current) => current.id === seed.bedId)
                   return (
-                    <li
+                    <button
                       key={seed.id}
-                      className={`seed-card${selectedSeed?.id === seed.id ? ' selected' : ''}`}
+                      type="button"
+                      className={`constellation-node${selectedSeed?.id === seed.id ? ' selected' : ''}`}
+                      style={{ '--node-x': `${node.x}%`, '--node-y': `${node.y}%`, '--node-color': bed?.color ?? '#267f83' } as CSSProperties}
+                      onClick={() => setSelectedSeedId(seed.id)}
+                      aria-pressed={selectedSeed?.id === seed.id}
                     >
-                      <button
-                        type="button"
-                        className="seed-select"
-                        onClick={() => setSelectedSeedId(seed.id)}
-                        aria-pressed={selectedSeed?.id === seed.id}
-                      >
-                        <div className="seed-card-head">
-                          <h3>{seed.text}</h3>
-                          <span className="meta">
-                            {seed.status} · {seed.tags.join(', ') || 'no tags'}
-                          </span>
-                        </div>
-                        {bed ? (
-                          <small className="seed-meta">Bed: {bed.name}</small>
-                        ) : null}
-                      </button>
-                    </li>
+                      <span className="constellation-node-status">{seed.status}</span>
+                      <span className="constellation-node-text">{seed.text}</span>
+                      <span className="constellation-node-meta">{bed?.name ?? 'Unassigned'} · Energy {seed.energy}/5</span>
+                    </button>
                   )
                 })}
-              </ul>
+              </div>
             )}
           </div>
           <aside className="inspector">
