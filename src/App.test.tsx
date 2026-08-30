@@ -65,17 +65,45 @@ describe('Lumen Garden navigation', () => {
     expect(screen.getByText('Select seeds to connect ideas and keep relation context visible.')).toBeInTheDocument()
   })
 
+  it('quietly explains the capture-to-review practice at the top of the garden', () => {
+    const repository = createRepository()
+    render(<App repository={repository} />)
+
+    const guide = screen.getByRole('region', { name: 'How this garden works' })
+    expect(within(guide).getByText('Capture a fragment before it disappears.')).toBeInTheDocument()
+    expect(within(guide).getByText('Connect it when another idea gives it context.')).toBeInTheDocument()
+    expect(within(guide).getByText('Choose one seed for a focused block.')).toBeInTheDocument()
+    expect(within(guide).getByText('Review the garden and decide what deserves attention next.')).toBeInTheDocument()
+  })
+
+  it('renders connected seeds as a readable constellation map', async () => {
+    const user = userEvent.setup()
+    const repository = createRepository()
+    const source = repository.captureSeed({ text: 'Map the field notes', tags: ['research'] })
+    const target = repository.captureSeed({ text: 'Turn patterns into a workshop', tags: ['teaching'] })
+    repository.addThread(source.id, target.id, 'extends')
+    render(<App repository={repository} />)
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
+
+    const map = screen.getByRole('region', { name: 'Constellation map' })
+    expect(within(map).getByRole('heading', { name: 'Map the field notes' })).toBeInTheDocument()
+    expect(within(map).getByRole('heading', { name: 'Turn patterns into a workshop' })).toBeInTheDocument()
+    expect(within(map).getByText('1 visible thread')).toBeInTheDocument()
+    const canvas = within(map).getByRole('group', { name: 'Constellation canvas' })
+    expect(canvas.querySelectorAll('line')).toHaveLength(1)
+  })
+
   it('renders connected seeds as keyboard-accessible constellation nodes', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
 
-    const constellation = screen.getByRole('group', { name: 'Visual constellation' })
-    const seedNode = within(constellation).getByRole('button', { name: /smallest useful capture flow/i })
-    expect(seedNode).toBeInTheDocument()
+    const constellation = screen.getByRole('group', { name: 'Constellation canvas' })
+    expect(within(constellation).getByRole('button', { name: /smallest useful lumen garden release/i })).toBeInTheDocument()
     expect(within(constellation).getAllByRole('button', { pressed: true })).toHaveLength(1)
-    expect(within(constellation).getAllByRole('button')).toHaveLength(5)
+    expect(within(constellation).getAllByRole('button')).toHaveLength(6)
   })
 
   it('captures a seed and starts a focus session for the selected seed', async () => {

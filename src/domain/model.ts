@@ -202,7 +202,7 @@ export function createDemoGarden(
   const productBed: Bed = {
     id: nextId('bed'),
     name: 'Product',
-    intent: 'Make the smallest useful idea workflow easy to understand',
+    intent: 'Turn the idea greenhouse into a useful local tool',
     color: '#2f8f94',
     health: 'growing',
     source: seedSource,
@@ -210,36 +210,36 @@ export function createDemoGarden(
     updatedAt: createdAt,
   }
 
-  const engineeringBed: Bed = {
+  const researchBed: Bed = {
     id: nextId('bed'),
-    name: 'Engineering',
-    intent: 'Keep local data and the public build dependable',
+    name: 'Research',
+    intent: 'Learn what makes a fragment worth returning to',
     color: '#d4ac47',
-    health: 'growing',
-    source: seedSource,
-    createdAt,
-    updatedAt: createdAt,
-  }
-
-  const launchBed: Bed = {
-    id: nextId('bed'),
-    name: 'Launch',
-    intent: 'Give reviewers a concrete, honest path through the project',
-    color: '#ce6f67',
     health: 'seedling',
     source: seedSource,
     createdAt,
     updatedAt: createdAt,
   }
 
-  const captureFlowSeed: Seed = {
+  const practiceBed: Bed = {
+    id: nextId('bed'),
+    name: 'Practice',
+    intent: 'Build a calmer rhythm for capture, focus, and review',
+    color: '#ce6f67',
+    health: 'growing',
+    source: seedSource,
+    createdAt,
+    updatedAt: createdAt,
+  }
+
+  const researchSeed: Seed = {
     id: nextId('seed'),
-    text: 'Define the smallest useful capture flow',
-    note: 'A person should be able to save a fragment without deciding its entire future.',
+    text: 'Ask five people why useful notes go stale',
+    note: 'Look for the moment a promising fragment loses its context or its next action.',
     energy: 4,
-    tags: ['capture', 'product'],
-    status: 'active',
-    bedId: productBed.id,
+    tags: ['research', 'interviews'],
+    status: 'inbox',
+    bedId: researchBed.id,
     source: seedSource,
     createdAt,
     updatedAt: createdAt,
@@ -247,88 +247,108 @@ export function createDemoGarden(
 
   const constellationSeed: Seed = {
     id: nextId('seed'),
-    text: 'Turn the constellation into a reviewer-readable map',
-    note: 'Relationship lines should explain why ideas are connected without becoming decoration.',
-    energy: 4,
-    tags: ['explore', 'design'],
-    status: 'inbox',
+    text: 'Connect fragments through explicit relationships',
+    note: 'The constellation should reveal a useful trail without hiding the original notes.',
+    energy: 5,
+    tags: ['constellation', 'product'],
+    status: 'active',
     bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 3_000,
     updatedAt: createdAt + 3_000,
   }
 
-  const persistenceSeed: Seed = {
+  const releaseSeed: Seed = {
     id: nextId('seed'),
-    text: 'Protect local data with import, export, and recovery checks',
-    note: 'No server means the repository boundary has to make data loss difficult.',
+    text: 'Define the smallest useful Lumen Garden release',
+    note: 'Capture quickly, connect deliberately, focus once, and review without a server.',
     energy: 5,
-    tags: ['testing', 'data', 'reliability'],
+    tags: ['release', 'scope'],
     status: 'active',
-    bedId: engineeringBed.id,
+    bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 6_000,
     updatedAt: createdAt + 6_000,
   }
 
-  const readmeSeed: Seed = {
+  const localDataSeed: Seed = {
     id: nextId('seed'),
-    text: 'Write the README around decisions a reviewer can inspect',
-    note: 'Show the product, explain its boundaries, and link to evidence instead of making broad claims.',
-    energy: 3,
-    tags: ['documentation', 'portfolio'],
-    status: 'inbox',
-    bedId: launchBed.id,
+    text: 'Keep every garden local, exportable, and recoverable',
+    note: 'Local-first only works when the data controls earn trust.',
+    energy: 4,
+    tags: ['data', 'trust'],
+    status: 'active',
+    bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 9_000,
     updatedAt: createdAt + 9_000,
   }
 
-  const deploymentSeed: Seed = {
+  const reviewSeed: Seed = {
     id: nextId('seed'),
-    text: 'Publish and verify the GitHub Pages demo',
-    note: 'A reviewer should be able to open the product without reproducing a local environment first.',
-    energy: 5,
-    tags: ['deployment', 'portfolio'],
-    status: 'inbox',
-    bedId: launchBed.id,
+    text: 'Run a weekly review that ends with one next action',
+    note: 'The review should make neglected work visible without turning into a reporting ritual.',
+    energy: 3,
+    tags: ['review', 'practice'],
+    status: 'active',
+    bedId: practiceBed.id,
     source: seedSource,
     createdAt: createdAt + 12_000,
     updatedAt: createdAt + 12_000,
   }
 
+  const onboardingSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Write the first-use walkthrough in the empty states',
+    note: 'The interface should teach capture, connection, and focus at the moment each becomes possible.',
+    energy: 2,
+    tags: ['onboarding', 'writing'],
+    status: 'inbox',
+    bedId: practiceBed.id,
+    source: seedSource,
+    createdAt: createdAt + 15_000,
+    updatedAt: createdAt + 15_000,
+  }
+
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    seeds: [captureFlowSeed, constellationSeed, persistenceSeed, readmeSeed, deploymentSeed],
-    beds: [productBed, engineeringBed, launchBed],
+    seeds: [researchSeed, constellationSeed, releaseSeed, localDataSeed, reviewSeed, onboardingSeed],
+    beds: [productBed, researchBed, practiceBed],
     threads: [
       {
         id: nextId('thread'),
-        fromSeedId: captureFlowSeed.id,
+        fromSeedId: researchSeed.id,
         toSeedId: constellationSeed.id,
-        relation: 'extends',
-        createdAt: createdAt + 15_000,
-      },
-      {
-        id: nextId('thread'),
-        fromSeedId: constellationSeed.id,
-        toSeedId: readmeSeed.id,
         relation: 'supports',
         createdAt: createdAt + 18_000,
       },
       {
         id: nextId('thread'),
-        fromSeedId: persistenceSeed.id,
-        toSeedId: deploymentSeed.id,
+        fromSeedId: constellationSeed.id,
+        toSeedId: releaseSeed.id,
         relation: 'supports',
         createdAt: createdAt + 21_000,
       },
       {
         id: nextId('thread'),
-        fromSeedId: readmeSeed.id,
-        toSeedId: deploymentSeed.id,
-        relation: 'supports',
+        fromSeedId: releaseSeed.id,
+        toSeedId: localDataSeed.id,
+        relation: 'extends',
         createdAt: createdAt + 24_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: reviewSeed.id,
+        toSeedId: releaseSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 27_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: onboardingSeed.id,
+        toSeedId: releaseSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 30_000,
       },
     ],
     focusSessions: [],

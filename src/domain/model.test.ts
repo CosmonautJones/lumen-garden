@@ -48,19 +48,20 @@ describe('selectNextSeed', () => {
 })
 
 describe('createDemoGarden', () => {
-  it('provides a clearly labeled portfolio-launch scenario with connected, removable demo data', () => {
-    let next = 0
+  it('seeds a connected product-work constellation instead of isolated placeholder ideas', () => {
+    let id = 0
     const garden = createDemoGarden(
       () => 1_700_000_000_000,
-      (prefix) => `${prefix}-${++next}`,
+      (prefix) => `${prefix}-${++id}`,
     )
 
-    expect(garden.meta.demoData).toBe(true)
-    expect(garden.beds.map((bed) => bed.name)).toEqual(['Product', 'Engineering', 'Launch'])
-    expect(garden.seeds).toHaveLength(5)
-    expect(garden.threads).toHaveLength(4)
-    expect(garden.seeds.every((item) => item.source === 'demo')).toBe(true)
-    expect(garden.beds.every((item) => item.source === 'demo')).toBe(true)
-    expect(garden.seeds.some((item) => item.text.includes('GitHub Pages demo'))).toBe(true)
+    expect(garden.beds.map((bed) => bed.name)).toEqual(['Product', 'Research', 'Practice'])
+    expect(garden.seeds).toHaveLength(6)
+    expect(garden.threads).toHaveLength(5)
+    expect(garden.seeds.map((seed) => seed.text)).toContain('Define the smallest useful Lumen Garden release')
+    expect(garden.threads.every((thread) =>
+      garden.seeds.some((seed) => seed.id === thread.fromSeedId) &&
+      garden.seeds.some((seed) => seed.id === thread.toSeedId),
+    )).toBe(true)
   })
 })
