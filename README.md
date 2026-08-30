@@ -6,6 +6,8 @@ Lumen Garden is a local-only React workspace for capturing small ideas, tending 
 
 **Live demo:** https://cosmonautjones.github.io/lumen-garden/
 
+![Constellation workspace showing three connected idea nodes, each with status and energy context.](public/constellation-overview.png)
+
 ## Why it exists
 
 Most idea tools optimize for collecting more. Lumen Garden optimizes for **returning to the useful fragment**: capture it quickly, give it context, connect it to adjacent work, and decide what to do next.
