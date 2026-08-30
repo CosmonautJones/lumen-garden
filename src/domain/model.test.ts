@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectNextSeed } from './model'
+import { createDemoGarden, selectNextSeed } from './model'
 import type { Seed } from './model'
 
 function seed(overrides: Partial<Seed>): Seed {
@@ -44,5 +44,23 @@ describe('selectNextSeed', () => {
       seed({ status: 'archived' }),
       seed({ id: 'focused', status: 'focused' }),
     ])).toBeNull()
+  })
+})
+
+describe('createDemoGarden', () => {
+  it('provides a clearly labeled portfolio-launch scenario with connected, removable demo data', () => {
+    let next = 0
+    const garden = createDemoGarden(
+      () => 1_700_000_000_000,
+      (prefix) => `${prefix}-${++next}`,
+    )
+
+    expect(garden.meta.demoData).toBe(true)
+    expect(garden.beds.map((bed) => bed.name)).toEqual(['Product', 'Engineering', 'Launch'])
+    expect(garden.seeds).toHaveLength(5)
+    expect(garden.threads).toHaveLength(4)
+    expect(garden.seeds.every((item) => item.source === 'demo')).toBe(true)
+    expect(garden.beds.every((item) => item.source === 'demo')).toBe(true)
+    expect(garden.seeds.some((item) => item.text.includes('GitHub Pages demo'))).toBe(true)
   })
 })

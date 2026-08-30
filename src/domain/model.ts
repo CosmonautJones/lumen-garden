@@ -199,10 +199,10 @@ export function createDemoGarden(
   const seedSource: SeedSource = 'demo'
   const createdAt = now()
 
-  const designBed: Bed = {
+  const productBed: Bed = {
     id: nextId('bed'),
-    name: 'Design',
-    intent: 'Shape ideas into prototypes and improve clarity',
+    name: 'Product',
+    intent: 'Make the smallest useful idea workflow easy to understand',
     color: '#2f8f94',
     health: 'growing',
     source: seedSource,
@@ -210,65 +210,125 @@ export function createDemoGarden(
     updatedAt: createdAt,
   }
 
-  const systemsBed: Bed = {
+  const engineeringBed: Bed = {
     id: nextId('bed'),
-    name: 'Systems',
-    intent: 'Convert proposals into reliable workflows',
+    name: 'Engineering',
+    intent: 'Keep local data and the public build dependable',
     color: '#d4ac47',
+    health: 'growing',
+    source: seedSource,
+    createdAt,
+    updatedAt: createdAt,
+  }
+
+  const launchBed: Bed = {
+    id: nextId('bed'),
+    name: 'Launch',
+    intent: 'Give reviewers a concrete, honest path through the project',
+    color: '#ce6f67',
     health: 'seedling',
     source: seedSource,
     createdAt,
     updatedAt: createdAt,
   }
 
-  const firstSeed: Seed = {
+  const captureFlowSeed: Seed = {
     id: nextId('seed'),
-    text: 'Capture one idea, then pick one concrete next action',
-    note: 'This is the shortest possible way to move an idea from thought to momentum.',
+    text: 'Define the smallest useful capture flow',
+    note: 'A person should be able to save a fragment without deciding its entire future.',
     energy: 4,
-    tags: ['capture', 'workflow'],
-    status: 'inbox',
+    tags: ['capture', 'product'],
+    status: 'active',
+    bedId: productBed.id,
     source: seedSource,
     createdAt,
     updatedAt: createdAt,
   }
 
-  const secondSeed: Seed = {
+  const constellationSeed: Seed = {
     id: nextId('seed'),
-    text: 'Draft a one-week review process for what actually ships',
-    note: 'Focus on outcomes, not output.',
-    energy: 3,
-    tags: ['review', 'execution'],
+    text: 'Turn the constellation into a reviewer-readable map',
+    note: 'Relationship lines should explain why ideas are connected without becoming decoration.',
+    energy: 4,
+    tags: ['explore', 'design'],
     status: 'inbox',
+    bedId: productBed.id,
     source: seedSource,
     createdAt: createdAt + 3_000,
     updatedAt: createdAt + 3_000,
   }
 
-  const thirdSeed: Seed = {
+  const persistenceSeed: Seed = {
     id: nextId('seed'),
-    text: 'Draft a local persistence migration test plan',
-    note: 'No server means every edge case must be solved in the repository.',
+    text: 'Protect local data with import, export, and recovery checks',
+    note: 'No server means the repository boundary has to make data loss difficult.',
     energy: 5,
-    tags: ['testing', 'data'],
+    tags: ['testing', 'data', 'reliability'],
     status: 'active',
-    bedId: systemsBed.id,
+    bedId: engineeringBed.id,
     source: seedSource,
     createdAt: createdAt + 6_000,
     updatedAt: createdAt + 6_000,
   }
 
+  const readmeSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Write the README around decisions a reviewer can inspect',
+    note: 'Show the product, explain its boundaries, and link to evidence instead of making broad claims.',
+    energy: 3,
+    tags: ['documentation', 'portfolio'],
+    status: 'inbox',
+    bedId: launchBed.id,
+    source: seedSource,
+    createdAt: createdAt + 9_000,
+    updatedAt: createdAt + 9_000,
+  }
+
+  const deploymentSeed: Seed = {
+    id: nextId('seed'),
+    text: 'Publish and verify the GitHub Pages demo',
+    note: 'A reviewer should be able to open the product without reproducing a local environment first.',
+    energy: 5,
+    tags: ['deployment', 'portfolio'],
+    status: 'inbox',
+    bedId: launchBed.id,
+    source: seedSource,
+    createdAt: createdAt + 12_000,
+    updatedAt: createdAt + 12_000,
+  }
+
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    seeds: [firstSeed, secondSeed, thirdSeed],
-    beds: [designBed, systemsBed],
+    seeds: [captureFlowSeed, constellationSeed, persistenceSeed, readmeSeed, deploymentSeed],
+    beds: [productBed, engineeringBed, launchBed],
     threads: [
       {
         id: nextId('thread'),
-        fromSeedId: firstSeed.id,
-        toSeedId: thirdSeed.id,
+        fromSeedId: captureFlowSeed.id,
+        toSeedId: constellationSeed.id,
         relation: 'extends',
-        createdAt: createdAt + 9_000,
+        createdAt: createdAt + 15_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: constellationSeed.id,
+        toSeedId: readmeSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 18_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: persistenceSeed.id,
+        toSeedId: deploymentSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 21_000,
+      },
+      {
+        id: nextId('thread'),
+        fromSeedId: readmeSeed.id,
+        toSeedId: deploymentSeed.id,
+        relation: 'supports',
+        createdAt: createdAt + 24_000,
       },
     ],
     focusSessions: [],

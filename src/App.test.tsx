@@ -49,6 +49,13 @@ afterEach(() => {
 })
 
 describe('Lumen Garden navigation', () => {
+  it('identifies the built-in portfolio-launch scenario as removable demo data', () => {
+    render(<App />)
+
+    expect(screen.getByText('Demo garden: portfolio launch plan. Clear it anytime.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear demo data' })).toBeInTheDocument()
+  })
+
   it('switches from the inbox to the constellation workspace', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -65,10 +72,10 @@ describe('Lumen Garden navigation', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'Explore' })).getByRole('button', { name: 'Constellation' }))
 
     const constellation = screen.getByRole('group', { name: 'Visual constellation' })
-    const seedNode = within(constellation).getByRole('button', { name: /Capture one idea/i })
+    const seedNode = within(constellation).getByRole('button', { name: /smallest useful capture flow/i })
     expect(seedNode).toBeInTheDocument()
     expect(within(constellation).getAllByRole('button', { pressed: true })).toHaveLength(1)
-    expect(within(constellation).getAllByRole('button')).toHaveLength(3)
+    expect(within(constellation).getAllByRole('button')).toHaveLength(5)
   })
 
   it('captures a seed and starts a focus session for the selected seed', async () => {

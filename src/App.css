@@ -115,6 +115,13 @@ nav {
   color: #d8d2c4;
 }
 
+.demo-notice {
+  margin: -0.35rem 0 0;
+  color: #f0d58f;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
 button,
 select,
 input,

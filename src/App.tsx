@@ -833,6 +833,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       <aside className="rail">
         <h1>Lumen Garden</h1>
         <p className="helper">Operate your ideas, then explore constellations.</p>
+        {state.meta.demoData ? (
+          <p className="demo-notice" role="status">Demo garden: portfolio launch plan. Clear it anytime.</p>
+        ) : null}
         <div className="navigation-cluster">
           <nav aria-label="Operate">
             <p className="navigation-label">Operate</p>
