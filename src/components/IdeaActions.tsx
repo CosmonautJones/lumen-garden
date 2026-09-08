@@ -32,7 +32,7 @@ export function IdeaActions({ seed, state, repository }: Props) {
     link.download = 'lumen-idea-handoff.json'
     link.click()
     URL.revokeObjectURL(url)
-    setNotice('Handoff downloaded. This is a read-only snapshot, not a garden backup.')
+    setNotice('Handoff downloaded. This is a read-only snapshot, not a full backup.')
   }
 
   return <div className="idea-tools">
@@ -46,7 +46,7 @@ export function IdeaActions({ seed, state, repository }: Props) {
       try {
         repository.editSeed(seed.id, { text: title, note, nextAction })
         setPanel(null)
-        setNotice('Idea saved on this device. Undo is available in Data.')
+        setNotice('Idea saved on this device. You can undo this change below.')
       } catch (error) {
         setNotice(`Not saved: ${error instanceof Error ? error.message : String(error)}. Your draft is still here.`)
       }
@@ -64,7 +64,7 @@ export function IdeaActions({ seed, state, repository }: Props) {
     </form> : null}
     {panel === 'handoff' ? <section className="handoff-panel" aria-label={`AI handoff for ${seed.text}`}>
       <h4>Take this idea to your assistant</h4>
-      <p>Preview, then copy into ChatGPT, Claude or your agent. Nothing is sent automatically. Review the response and record the useful result in Focus.</p>
+      <p>Preview, then copy into ChatGPT, Claude or your agent. Nothing is sent automatically. Review the response, then start a focus session on this idea and save the useful result as progress.</p>
       <label className="connection-choice"><input type="checkbox" checked={includeConnections} onChange={event => setIncludeConnections(event.target.checked)} /> Include connected idea titles</label>
       <p className="helper">Includes this idea, its project goal and completed outcomes. Other ideas stay private unless you include their connected titles.</p>
       <label htmlFor={`${id}-preview`}>Handoff preview</label>

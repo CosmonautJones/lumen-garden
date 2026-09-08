@@ -23,4 +23,4 @@ Build an offline-first idea greenhouse where fragments become connected projects
 - Demo data is clearly demo data and removable.
 
 ## Visual direction
-Primary surface: **Operate**, secondary: **Explore**. Dense, calm, tactile, keyboard-friendly. Botanical without green-gradient clichés. Use warm paper-black neutrals, mineral teal, pollen gold, and restrained coral. Typography and spacing create hierarchy before boxes. No hero, feature grid, glassmorphism, fake metrics, or icon confetti.
+Primary surface: a minimal home capture field, short Continue working list, and one focused idea detail. Search and Settings are secondary. Use soft white and graphite, restrained blue, readable system typography, generous space and precise keyboard-friendly controls. No botanical vocabulary in primary flows, glassmorphism, fake metrics or icon confetti. Keep the original Operate/Explore tools optional under Settings → Advanced workspace.

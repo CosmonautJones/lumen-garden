@@ -8,13 +8,17 @@ Lumen Garden is a private, offline-first workspace for turning scattered thought
 - **Thread**: an explicit relationship between two seeds.
 - **Focus session**: a short commitment to advance one seed.
 
+## Primary experience
+The default interface is a calm, minimal home screen: “What do you want to move forward?” One capture field opens a focused idea detail. Optional context, editing and assistant handoff use progressive disclosure.
+
 ## Core flows
-1. Capture a seed instantly from any screen (`C` or global capture control).
-2. Triage inbox seeds into a bed, archive them, or promote one to focus.
-3. Explore a constellation of seeds and their threads; select without losing spatial context.
-4. Enter Focus mode, choose a duration, write a concrete outcome, and complete or pause.
-5. Review the garden by bed, status, tag, and recency.
-6. Export all data as JSON and import only after schema validation and a preview.
+1. Capture from the home field; optional context expands on request.
+2. Open one idea with its context, next action, focus controls and progress together.
+3. Work for a short block, pause/resume as needed, then save what changed.
+4. Use Search to retrieve all ideas, including archived work, by title, context, next action or tags.
+5. Archive completed work, restore from Search, or Undo accepted reversible changes.
+6. Export and restore through Settings; validate and preview before confirmed replacement.
+7. Access the original projects, connections and filters in Settings → Advanced workspace. These are optional, not prerequisites for capture or focus.
 
 ## Required product qualities
 - Offline and local-only.

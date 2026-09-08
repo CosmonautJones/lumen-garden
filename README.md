@@ -6,29 +6,19 @@ A private notebook that turns an idea into one next action, then keeps a record 
 
 Use it when you have thoughts scattered across notes and chats, but cannot tell what to do next. It is useful for preparing an interview, planning a small project, developing a piece of writing, or collecting research you intend to act on.
 
-## Try a complete workflow in two minutes
+## Try it in two minutes
 
-1. **Capture:** type “Prepare for a software engineering interview” and press Capture.
-2. **Clarify:** choose **Edit idea**, add context, and set **Next action** to “Practice one story about a difficult production bug.” Save.
-3. **Organize (optional):** create a project in **Projects (beds)**, then assign the idea to it. Find organized ideas in **Review**; search by title, notes, next action or tag.
-4. **Work yourself:** choose **Focus now**, spend a short block on the visible next action, record what changed in **Outcome text**, then Complete. **Recent outcomes** keeps the result.
-5. **Or work with an assistant:** choose **AI handoff**, read the preview, and copy it into your preferred assistant. Review its response; record the useful result in your notes or a focus outcome.
-6. **Close the loop:** update the next action or Archive from Review when the idea is finished. Restore or Undo if you change your mind.
+1. **Capture:** type “Prepare for a software engineering interview” in the single home field and press the arrow (Add idea). Add context only if you need it.
+2. **Clarify:** the idea opens. Choose **Edit idea** and set **Next action** to “Practice one story about a difficult production bug.” Save.
+3. **Work:** choose a focus time and **Start focus**. Record **What changed?**, then **Save progress**. Your next action, context and past results stay together.
+4. **Get help (optional):** open **AI handoff**, inspect the preview and copy it into your assistant. Bring useful results back manually.
+5. **Return:** **Continue working** shows your five most recently updated ideas, with the active focus session first. **Search** also finds archived ideas. Archive finished work; restore or undo if you change your mind.
+
+The soft white and graphite interface keeps one capture field, a short list and one detail view in the main flow. No account setup or garden vocabulary is required. Examples are clearly marked and removable without removing your own work.
+
+**Settings** holds backup, validated restore and recovery. The **advanced workspace** preserves the original projects, connections, filters and keyboard command menu for existing users. Its domain terminology remains in exported JSON for backwards compatibility.
 
 Completing a focus block records progress; it does not declare the whole idea done. The app does not send a prompt or run an agent for you.
-
-## The garden names, translated
-
-| In the app | Plain meaning |
-|---|---|
-| Seed / idea | A thought with notes and an optional concrete next action |
-| Bed / project | A group of ideas with a shared goal |
-| Constellation | An optional map of connections between ideas |
-| Focus | A timed block with a recorded outcome |
-| Review | Search and revisit ideas, including archived work |
-| Energy | Your own 1–5 rating, used by the simple next-idea suggestion |
-
-The first visit contains a clearly labeled example garden. **Clear demo data** removes only the examples after confirmation. You can capture your own idea immediately.
 
 ## Working with a bot or AI assistant
 
@@ -74,7 +64,7 @@ npm run build
 
 The GitHub Actions workflow runs the same checks on every push and pull request to `main`.
 
-## Keyboard map
+## Advanced workspace keyboard map
 
 | Key | Action |
 | --- | --- |
@@ -99,13 +89,14 @@ src/
     *.test.ts         Persistence, handoff and repository behavior tests
   components/
     IdeaActions.tsx   Inline editing and handoff preview
-  App.tsx             Operate/Explore product surface
+  App.tsx             Minimal home, search, settings and idea detail
+  AdvancedWorkspace.tsx  Optional original Operate/Explore tools (lazy loaded)
   App.css             Responsive visual system and accessibility states
 ```
 
 The domain repository is intentionally separated from React presentation. It owns persistence, schema validation, migrations, referential integrity, and reversible destructive actions. React subscribes through a stable external-store snapshot so the interface is responsive without leaking mutable state into view logic.
 
-Review keeps prioritization inspectable: active seeds come before inbox seeds; within either state, higher-energy work comes first, then the seed that has waited the longest. The recommendation is a shortcut into a focus block, not a hidden scheduler.
+In the advanced workspace, Review keeps prioritization inspectable: active seeds come before inbox seeds; within either state, higher-energy work comes first, then the seed that has waited the longest. The recommendation is a shortcut into a focus block, not a hidden scheduler.
 
 ## Data and privacy
 
