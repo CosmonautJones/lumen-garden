@@ -299,3 +299,39 @@ describe('GardenRepository', () => {
     expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/invalid seed status/i)
   })
 })
+
+it('edits an idea and next action durably, with undo and export round-trip', () => {
+  const storage = new MemoryStorage()
+  const repository = createRepository(storage)
+  const seed = repository.captureSeed({ text: 'Rough idea' })
+  repository.editSeed(seed.id, { text: 'Useful idea', note: 'Context', nextAction: 'Interview one user' })
+  const reloaded = createRepository(storage)
+  expect(reloaded.getSeed(seed.id)).toEqual(expect.objectContaining({ text: 'Useful idea', nextAction: 'Interview one user' }))
+  const copy = createRepository(new MemoryStorage())
+  copy.importData(repository.exportData())
+  expect(copy.getSeed(seed.id)?.nextAction).toBe('Interview one user')
+  repository.undoLast()
+  expect(repository.getSeed(seed.id)?.text).toBe('Rough idea')
+})
+
+it('rejects empty edits and preserves accepted data if saving an edit fails', () => {
+  const storage = new MemoryStorage()
+  const repository = createRepository(storage)
+  const seed = repository.captureSeed({ text: 'Keep this' })
+  const before = repository.getState()
+  expect(() => repository.editSeed(seed.id, { text: ' ', note: '', nextAction: '' })).toThrow(/required/i)
+  storage.failWrites = true
+  expect(() => repository.editSeed(seed.id, { text: 'Changed', note: '', nextAction: 'Try' })).toThrow()
+  expect(repository.getState()).toEqual(before)
+})
+
+it('upgrades v1 data without losing ideas and rejects malformed next actions', () => {
+  const repository = createRepository()
+  const payload = JSON.parse(repository.exportData())
+  payload.schemaVersion = 1
+  repository.importData(JSON.stringify(payload))
+  expect(repository.getState().schemaVersion).toBe(2)
+  payload.schemaVersion = 2
+  payload.seeds[0].nextAction = { command: 'not text' }
+  expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/next action/i)
+})

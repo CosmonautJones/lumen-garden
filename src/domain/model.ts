@@ -1,4 +1,4 @@
-export const CURRENT_SCHEMA_VERSION = 1
+export const CURRENT_SCHEMA_VERSION = 2
 export const STORAGE_KEY = 'lumen-garden:local-repository'
 
 export const MIN_ENERGY = 1
@@ -14,6 +14,7 @@ export interface Seed {
   id: string
   text: string
   note?: string
+  nextAction?: string
   energy: number
   tags: string[]
   status: SeedStatus

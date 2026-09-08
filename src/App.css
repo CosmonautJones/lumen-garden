@@ -1106,3 +1106,51 @@ kbd {
     flex-direction: column;
   }
 }
+
+/* The notebook stays in view; help never consumes the workspace. */
+.product-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.product-heading h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-top: .35rem; }
+.product-heading > p { max-width: 27rem; margin: 0; color: #5e594f; font-size: .9rem; }
+.workflow-guide { display: block; margin: 0 0 1rem; padding: .7rem 0; }
+.workflow-guide details { width: 100%; }
+.workflow-guide summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
+.workflow-guide ol { margin: 1rem 0; }
+.workflow-guide p { font-size: .9rem; }
+.idea-tools { margin-top: .8rem; }
+.idea-next-action { border-left: 3px solid var(--accent); padding-left: .65rem; white-space: pre-wrap; }
+.idea-editor, .handoff-panel { display: grid; gap: .55rem; margin-top: .75rem; padding: 1rem; border: 1px solid #b8ccc5; border-radius: .5rem; background: #f2f6f0; }
+.idea-editor input, .idea-editor textarea, .handoff-panel textarea, .search-ideas input { width: 100%; min-width: 0; padding: .65rem; font: inherit; border: 1px solid #a8aca1; border-radius: .35rem; background: #fffefb; }
+.handoff-panel textarea { font-family: ui-monospace, monospace; font-size: .8rem; resize: vertical; }
+.handoff-panel p { margin: .2rem 0; }
+.connection-choice { display: flex; align-items: center; gap: .5rem; }
+.connection-choice input { min-block-size: 0; width: auto; }
+.search-ideas { display: grid; gap: .5rem; margin: 1rem 0; }
+.outcome-history { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.seed-card, .handoff-panel { overflow-wrap: anywhere; }
+.seed-note { white-space: pre-wrap; }
+.rail h2 small { font: .75rem var(--font-sans); }
+@media (min-width: 1100px) and (max-width: 1400px) {
+  .app-shell { flex-direction: row; }
+  .rail { width: 255px; order: 0; border-right: 1px solid #4b4b40; border-top: 0; }
+  .navigation-cluster { display: grid; }
+  .mobile-primary-navigation { display: none; }
+  .capture-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .capture-controls input:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 1099px) {
+  .capture-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .capture-controls input:first-child { grid-column: 1 / -1; }
+  .mobile-primary-navigation { gap: .35rem; }
+  .mobile-operate-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workflow-guide ol { grid-template-columns: 1fr 1fr; }
+  .product-heading { display: block; }
+  .product-heading > p { margin-top: .5rem; }
+}
+@media (max-width: 500px) {
+  .capture-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .capture-controls input { width: 100%; min-width: 0; }
+  .seed-card-head { flex-direction: column; align-items: start; }
+  .seed-actions { flex-wrap: wrap; }
+  .seed-actions select { max-width: 100%; }
+  .workflow-guide ol { grid-template-columns: 1fr; }
+}

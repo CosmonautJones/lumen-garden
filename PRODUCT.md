@@ -1,9 +1,9 @@
 # Product Brief: Lumen Garden
 
-Lumen Garden is a private, offline-first workspace for turning scattered thoughts into living projects.
+Lumen Garden is a private, offline-first workspace for turning scattered thoughts into concrete next actions and recorded outcomes. People may work themselves or intentionally export selected context to an assistant.
 
 ## Core objects
-- **Seed**: a captured fragment with text, optional note, energy, tags, and status.
+- **Seed**: a captured fragment with text, optional note, next action, energy, tags, and status.
 - **Bed**: a project/theme that groups seeds and has an intent, color, and health.
 - **Thread**: an explicit relationship between two seeds.
 - **Focus session**: a short commitment to advance one seed.
@@ -33,3 +33,7 @@ Lumen Garden is a private, offline-first workspace for turning scattered thought
 - Primary flows work in a real browser.
 - No console errors on initial load and major interactions.
 - README contains setup, architecture, keyboard map, data/privacy statement, and limitations.
+
+## Human and assistant workflow
+
+Capture → edit a next action → organize (optional) → focus or preview an AI handoff → record an outcome → revisit or archive. The constellation is optional. Handoffs are read-only snapshots of one idea; connected titles require explicit opt-in. No automatic agent access, server or provider credential is introduced.

@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } fr
 import { relationLabel, selectNextSeed } from './domain/model'
 import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
+import { IdeaActions } from './components/IdeaActions'
 import './App.css'
 
 type MainView = 'inbox' | 'explore' | 'focus' | 'review'
@@ -91,6 +92,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
   const [selectedSeedId, setSelectedSeedId] = useState('')
   const [threadTargetId, setThreadTargetId] = useState('')
   const [threadRelation, setThreadRelation] = useState<RelationType>('supports')
+  const [searchText, setSearchText] = useState('')
   const [filterTag, setFilterTag] = useState('')
   const [filterStatus, setFilterStatus] = useState<SeedStatus | 'all'>('all')
   const [filterBed, setFilterBed] = useState<string>('all')
@@ -197,11 +199,12 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     const cutoffMs = filterRecency === 'all' ? 0 : nowTick - Number(filterRecency) * 24 * 60 * 60 * 1000
     return state.seeds
       .filter((seed) => (filterStatus === 'all' ? true : seed.status === filterStatus))
+      .filter((seed) => [seed.text, seed.note, seed.nextAction, ...seed.tags].join(' ').toLowerCase().includes(searchText.trim().toLowerCase()))
       .filter((seed) => (filterBed === 'all' ? true : seed.bedId === filterBed))
       .filter((seed) => (filterTag.length === 0 ? true : seed.tags.includes(filterTag.trim().toLowerCase())))
       .filter((seed) => (filterRecency === 'all' ? true : seed.updatedAt >= cutoffMs))
       .sort(byRecent)
-  }, [filterBed, filterRecency, filterStatus, filterTag, nowTick, state.seeds])
+  }, [filterBed, filterRecency, filterStatus, filterTag, searchText, nowTick, state.seeds])
 
   const nextSeed = useMemo(() => selectNextSeed(state.seeds), [state.seeds])
 
@@ -425,11 +428,11 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     return (
       <section className="pane" aria-label="Inbox">
         <h2>Inbox</h2>
-        <p className="helper">Capture ideas here, then triage to beds, archive, or focus.</p>
+        <p className="helper">Write a thought. Use Edit idea to give it one next action. Group it into a project, start a focus block, or prepare an AI handoff.</p>
         {inboxSeeds.length === 0 ? (
           <div className="empty">
             <p>The inbox is clear.</p>
-            <p>Capture one seed to begin an operating cycle.</p>
+            <p>Try “Prepare for an interview” or “Plan a weekend trip”. Add a next action after capturing.</p>
             <button type="button" className="empty-action" onClick={focusCapture}>
               Capture a seed
             </button>
@@ -454,6 +457,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                     ))}
                   </div>
                 )}
+                <IdeaActions seed={seed} state={state} repository={repository} />
                 <div className="seed-actions">
                   <label htmlFor={`seed-bed-${seed.id}`} className="sr-only">
                     Move to bed
@@ -692,6 +696,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
               {activeSession.status === 'running' ? 'Running' : activeSession.status === 'paused' ? 'Paused' : 'Finished'}{' '}
               · Remaining {formatRemaining(activeSession, nowTick)}
             </p>
+            {state.seeds.find(seed => seed.id === activeSession.seedId)?.nextAction ? <p className="idea-next-action"><strong>Next action:</strong> <span>{state.seeds.find(seed => seed.id === activeSession.seedId)?.nextAction}</span></p> : null}
             <label htmlFor="focus-outcome">Outcome text</label>
             <textarea
               id="focus-outcome"
@@ -774,6 +779,17 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             </div>
           </article>
         )}
+        <section className="outcome-history" aria-label="Recent outcomes">
+          <h3>Recent outcomes</h3>
+          <p className="helper">Completing a block records progress; the idea stays available for another step. Archive it in Review when you are finished.</p>
+          {state.focusSessions.some(session => session.status === 'completed') ? <ul className="seed-list">
+            {state.focusSessions.filter(session => session.status === 'completed').slice().sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, 10).map(session => <li key={session.id} className="seed-card">
+              <h4>{state.seeds.find(seed => seed.id === session.seedId)?.text ?? 'Idea'}</h4>
+              <p>{session.outcome?.trim() || 'No outcome note recorded.'}</p>
+              <small>{session.endedAt ? formatDate(session.endedAt) : ''} · {session.durationMinutes}-minute block</small>
+            </li>)}
+          </ul> : <p className="helper">Your completed blocks will appear here. Write what changed before pressing Complete.</p>}
+        </section>
       </section>
     )
   }
@@ -803,6 +819,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             <p>Finish the current focus block or capture a fresh idea when it arrives.</p>
           </div>
         )}
+        <label className="search-ideas">Search ideas
+          <input type="search" aria-label="Search ideas" placeholder="Find a title, note, next action or tag" value={searchText} onChange={event => setSearchText(event.target.value)} />
+        </label>
         <div className="filters">
           <label>
             Status
@@ -859,9 +878,11 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                   </span>
                 </div>
                 {seed.note ? <p className="seed-note">{seed.note}</p> : null}
+                <IdeaActions seed={seed} state={state} repository={repository} />
                 <div className="seed-actions">
                   <button
                     type="button"
+                    disabled={seed.status === 'archived'}
                     onClick={() => {
                       setView('focus')
                       handleStartFocus(seed.id)
@@ -873,7 +894,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                     <button type="button" onClick={() => handleRestore(seed.id)}>
                       Restore
                     </button>
-                  ) : null}
+                  ) : (
+                    <button type="button" disabled={seed.status === 'focused'} onClick={() => handleArchive(seed.id)}>Archive</button>
+                  )}
                 </div>
               </li>
             ))}
@@ -887,7 +910,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
     <div className="app-shell">
       <aside className="rail">
         <h1>Lumen Garden</h1>
-        <p className="helper">Operate your ideas, then explore constellations.</p>
+        <p className="helper">A private idea notebook with a next step. Capture, clarify, work, and keep the result.</p>
         {state.meta.demoData ? (
           <p className="demo-notice" role="status">Demo garden: portfolio launch plan. Clear it anytime.</p>
         ) : null}
@@ -905,9 +928,9 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
         </div>
 
         <section className="rail-card">
-          <h2>Beds</h2>
+          <h2>Projects <small>(beds)</small></h2>
           {state.beds.length === 0 ? (
-            <p className="helper">No beds yet. Add one to organize work.</p>
+            <p className="helper">No projects yet. Create a bed to group ideas around a goal.</p>
           ) : (
             <ul className="bed-list">
               {bedOptions.map((bed) => (
@@ -1011,7 +1034,6 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             </section>
           ) : null}
           {importError ? <p className="error" role="alert">{importError}</p> : null}
-          {actionError ? <p className="error" role="alert">{actionError}</p> : null}
           {importPreview ? (
             <section className="import-preview">
               <h3>Import preview</h3>
@@ -1043,6 +1065,11 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
       </aside>
 
       <main className={`main ${selectedSeed?.source === 'demo' ? 'demo-highlight' : ''}`}>
+        <header className="product-heading">
+          <div><p className="eyebrow">Lumen Garden · saved on this device</p><h2>Ideas into next steps.</h2></div>
+          <p>For things you want to do, not just collect. No account. No automatic AI access.</p>
+        </header>
+        {actionError ? <p className="error" role="alert">{actionError}</p> : null}
         <header className="capture-bar">
           <form onSubmit={handleCapture}>
             <label htmlFor="capture-text">Idea fragment</label>
@@ -1052,7 +1079,7 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
                 id="capture-text"
                 value={captureText}
                 onChange={(event) => setCaptureText(event.target.value)}
-                placeholder="Type a seed in under five seconds"
+                placeholder="What do you want to remember or move forward?"
                 autoComplete="off"
                 required
               />
@@ -1118,28 +1145,17 @@ function App({ repository = DEFAULT_REPOSITORY }: AppProps) {
             </p>
           </header>
           <section className="workflow-guide" aria-label="How this garden works">
-            <div className="workflow-guide-intro">
-              <p className="eyebrow">A practice, not a pile</p>
-              <h2>Give each useful fragment a place to go next.</h2>
-            </div>
-            <ol>
-              <li>
-                <span>01</span>
-                <p>Capture a fragment before it disappears.</p>
-              </li>
-              <li>
-                <span>02</span>
-                <p>Connect it when another idea gives it context.</p>
-              </li>
-              <li>
-                <span>03</span>
-                <p>Choose one seed for a focused block.</p>
-              </li>
-              <li>
-                <span>04</span>
-                <p>Review the garden and decide what deserves attention next.</p>
-              </li>
-            </ol>
+            <details>
+              <summary>New here? Capture → next action → focus or AI handoff → outcome</summary>
+              <p>A seed is an idea. A bed is a project. The constellation shows connections; it is optional.</p>
+              <ol>
+                <li><span>01</span><p>Capture a fragment before it disappears.</p></li>
+                <li><span>02</span><p>Connect it when another idea gives it context.</p></li>
+                <li><span>03</span><p>Choose one seed for a focused block.</p></li>
+                <li><span>04</span><p>Review the garden and decide what deserves attention next.</p></li>
+              </ol>
+              <p>Example: “Prepare for an interview” → “Practice one STAR story” → work for 15 minutes or ask your assistant for a draft → record what improved.</p>
+            </details>
           </section>
           <p className="sr-only" role="status">{workspaceMode}: {workspaceName}{dataNotice ? `. ${dataNotice}` : ''}</p>
           {view === 'inbox'

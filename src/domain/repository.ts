@@ -169,6 +169,8 @@ function normalizeSeedRaw(
     updatedAt,
   }
 
+  if (asText(data.nextAction)) normalized.nextAction = asText(data.nextAction)
+
   const note = asText(data.note)
   if (note) {
     normalized.note = note
@@ -359,6 +361,9 @@ function validateCurrentPayload(raw: LegacyPayload): void {
     if (asText(seed.text).length === 0) {
       throw new Error('Imported seed text must not be empty')
     }
+    if (seed.nextAction !== undefined && typeof seed.nextAction !== 'string') {
+      throw new Error('Imported seed has an invalid next action')
+    }
     if (!isOneOf(seed.status, ['inbox', 'active', 'focused', 'archived'])) {
       throw new Error('Imported seed has an invalid seed status')
     }
@@ -533,7 +538,7 @@ function parsePayload(
     throw new Error(`Cannot import newer schema version ${schemaVersion}`)
   }
 
-  if (schemaVersion === CURRENT_SCHEMA_VERSION && Array.isArray((data as LegacyPayload).beds)) {
+  if ((schemaVersion === 1 || schemaVersion === CURRENT_SCHEMA_VERSION) && Array.isArray((data as LegacyPayload).beds)) {
     validateCurrentPayload(data as LegacyPayload)
     return normalizeCurrentPayload(data as LegacyPayload, now, idFactory)
   }
@@ -689,6 +694,19 @@ export class GardenRepository {
       state.meta.demoData = false
     })
     return seed
+  }
+
+  editSeed(seedId: string, input: { text: string; note: string; nextAction: string }): void {
+    const text = asText(input.text)
+    if (!text) throw new Error('Idea title is required')
+    this.commit((state) => {
+      const seed = state.seeds.find((item) => item.id === seedId)
+      if (!seed) throw new Error(`Seed not found: ${seedId}`)
+      seed.text = text
+      seed.note = asText(input.note)
+      seed.nextAction = asText(input.nextAction)
+      seed.updatedAt = this.now()
+    }, { label: 'Edit idea', recordUndo: true })
   }
 
   moveSeedToBed(seedId: string, bedId: string): void {
