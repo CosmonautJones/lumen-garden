@@ -66,3 +66,7 @@ node scripts/check-garden.cjs
 On a normal development machine with registry access, use `npm ci`, `npm run lint`, `npm test -- --run`, and `npm run build`. The browser scripts require an already installed `@playwright/test` and Chromium; supply the two environment variables if installed outside this project. No browser testing dependency was added to the application lockfile.
 
 The source ZIP and sibling patch include all interface work relative to public baseline `be60ae908173e2b93fda9cf2abd562c166e0805c`. No commit, push, publication, or deployment was performed during this validation phase.
+
+## Publication verification
+
+Implementation commit [`fe5f869`](https://github.com/CosmonautJones/lumen-garden/commit/fe5f869500313a3534ca30da26b303cb0742bc9f) was committed and fast-forwarded to main after explicit authorization. [GitHub Verify run 42475876297](https://github.com/CosmonautJones/lumen-garden/actions/runs/42475876297) completed the exact-lockfile dependency install, lint, tests, and build successfully. [Pages run 42475876287](https://github.com/CosmonautJones/lumen-garden/actions/runs/42475876287) deployed successfully. These remote checks resolve the local install/lint gap for that implementation commit; the browser-coverage limits above still apply. Repository visibility and workflow settings were unchanged.

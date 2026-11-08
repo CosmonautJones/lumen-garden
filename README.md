@@ -1,14 +1,14 @@
 # Lumen Garden
 
-## Garden interface preview (2026-11-07)
+## Garden workspace
 
 The new default Garden shows notebook ideas as selectable plants, with their next action and recorded focus outcomes alongside them. Seed, Growing, In focus, Paused, and Progress recorded reflect existing notebook records. Flowers require a nonempty completed outcome; they never mean independent verification. Example plants are labeled and can be removed without removing your own ideas.
 
-Notebook retains the previous capture/detail workflow. Search, backup/recovery, manual AI handoffs, and the advanced workspace remain available. No storage key, schema, or repository behavior changed. There is no TravOS integration or unattended execution.
+Notebook retains the previous capture/detail workflow. Search, backup/recovery, manual AI handoffs, and the advanced workspace remain available. The storage key and schema are unchanged. Storage recovery, import validation, and example-project removal have additional protections. There is no TravOS integration or unattended execution.
 
-This local preview is a separate browser origin from the published app. Its examples are not your live notebook. Your existing data remains at its original origin; use the existing export/confirmed import controls only if you intentionally want to copy it here.
+When running locally, the preview has a separate browser origin from the published app. Its examples are not your live notebook. Existing data stays at its original origin; use export and confirmed import only when you intentionally want to transfer it.
 
-See `docs/evidence/garden-interface-verification.md` for exact checks and toolchain limitations. This is an isolated source snapshot of revision `be60ae908173e2b93fda9cf2abd562c166e0805c`, not a published change.
+The garden and robustness changes are published on main. See [the verification report](docs/evidence/garden-polish-verification.md) for the 73 tests, 17 browser scenarios, and remaining browser-coverage limits. [GitHub verification](https://github.com/CosmonautJones/lumen-garden/actions/runs/42475876297) passed the exact-lockfile install, lint, tests, and build; [Pages deployment](https://github.com/CosmonautJones/lumen-garden/actions/runs/42475876287) succeeded for the implementation commit.
 
 A private notebook that turns an idea into one next action, then keeps a record of what you did.
 
@@ -18,13 +18,13 @@ Use it when you have thoughts scattered across notes and chats, but cannot tell 
 
 ## Try it in two minutes
 
-1. **Capture:** type “Prepare for a software engineering interview” in the single home field and press the arrow (Add idea). Add context only if you need it.
+1. **Capture:** type “Prepare for a software engineering interview” in the Garden capture field and choose **Plant it**. Add context in **Edit idea** if you need it.
 2. **Clarify:** the idea opens. Choose **Edit idea** and set **Next action** to “Practice one story about a difficult production bug.” Save.
 3. **Work:** choose a focus time and **Start focus**. Record **What changed?**, then **Save progress**. Your next action, context and past results stay together.
 4. **Get help (optional):** open **AI handoff**, inspect the preview and copy it into your assistant. Bring useful results back manually.
-5. **Return:** **Continue working** shows your five most recently updated ideas, with the active focus session first. **Search** also finds archived ideas. Archive finished work; restore or undo if you change your mind.
+5. **Return:** select a plant in **Garden** to inspect its next step and recorded outcomes. **Notebook** keeps the compact Continue working list, with the active focus session first. **Search** also finds archived ideas. Archive finished work; restore or undo if you change your mind.
 
-The soft white and graphite interface keeps one capture field, a short list and one detail view in the main flow. No account setup or garden vocabulary is required. Examples are clearly marked and removable without removing your own work.
+Garden uses a warm botanical view; Notebook keeps the compact white-and-graphite list. Both share the same ideas, capture, and detail workflow. No account setup is required. Examples are clearly marked and removable without removing your own work.
 
 **Settings** holds backup, validated restore and recovery. The **advanced workspace** preserves the original projects, connections, filters and keyboard command menu for existing users. Its domain terminology remains in exported JSON for backwards compatibility.
 
