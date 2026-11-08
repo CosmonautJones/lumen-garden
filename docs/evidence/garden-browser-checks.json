@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "label": "garden-mobile",
+      "document": 360,
+      "viewport": 360
+    },
+    {
+      "label": "notebook-mobile",
+      "document": 360,
+      "viewport": 360
+    },
+    {
+      "label": "search-mobile",
+      "document": 360,
+      "viewport": 360
+    },
+    {
+      "label": "settings-mobile",
+      "document": 360,
+      "viewport": 360
+    },
+    {
+      "label": "idea-detail-mobile",
+      "document": 360,
+      "viewport": 360
+    }
+  ],
+  "errors": [],
+  "passed": [
+    "capture",
+    "edit next action",
+    "focus",
+    "record outcome",
+    "reload persistence",
+    "seed focus"
+  ],
+  "data": "Fresh isolated browser; illustrative examples and QA test goal only."
+}

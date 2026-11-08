@@ -1,5 +1,15 @@
 # Lumen Garden
 
+## Garden interface preview (2026-11-07)
+
+The new default Garden shows notebook ideas as selectable plants, with their next action and recorded focus outcomes alongside them. Seed, Growing, In focus, Paused, and Progress recorded reflect existing notebook records. Flowers require a nonempty completed outcome; they never mean independent verification. Example plants are labeled and can be removed without removing your own ideas.
+
+Notebook retains the previous capture/detail workflow. Search, backup/recovery, manual AI handoffs, and the advanced workspace remain available. No storage key, schema, or repository behavior changed. There is no TravOS integration or unattended execution.
+
+This local preview is a separate browser origin from the published app. Its examples are not your live notebook. Your existing data remains at its original origin; use the existing export/confirmed import controls only if you intentionally want to copy it here.
+
+See `docs/evidence/garden-interface-verification.md` for exact checks and toolchain limitations. This is an isolated source snapshot of revision `be60ae908173e2b93fda9cf2abd562c166e0805c`, not a published change.
+
 A private notebook that turns an idea into one next action, then keeps a record of what you did.
 
 **[Open Lumen Garden](https://cosmonautjones.github.io/lumen-garden/)** · No account · Data stays in your browser
@@ -63,6 +73,12 @@ npm run build
 ```
 
 The GitHub Actions workflow runs the same checks on every push and pull request to `main`.
+
+### Garden browser regression checks
+
+After a production build, `node scripts/check-polish.cjs` runs 17 isolated Chromium scenarios across keyboard access, mobile layouts, persistence, storage failures, backup/recovery, and example-data removal. It requires an existing `@playwright/test` installation and Chromium. Set `PLAYWRIGHT_MODULE` and `PLAYWRIGHT_CHROMIUM_EXECUTABLE` if those are outside the project. No testing browser profile or real notebook is reused; built assets are fulfilled locally without a server.
+
+See [the three-pass verification report](docs/evidence/garden-polish-verification.md) for changes, exact commands, results, and current toolchain limitations. The original [interface report](docs/evidence/garden-interface-verification.md) is retained as historical evidence.
 
 ## Advanced workspace keyboard map
 

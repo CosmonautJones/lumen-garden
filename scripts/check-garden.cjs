@@ -1,0 +1,53 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
+const fs = require('fs');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE, headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1080 } });
+  await context.route('http://lumen.test/**', async route => {
+    const requested = new URL(route.request().url()).pathname;
+    const file = path.join(process.cwd(), 'dist', requested === '/' ? 'index.html' : requested);
+    const contentType = file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html';
+    await route.fulfill({ body: fs.readFileSync(file), contentType });
+  });
+  const page = await context.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('http://lumen.test/');
+  await page.getByRole('heading', { name: 'Your ideas, growing.' }).waitFor();
+  await page.screenshot({ path: 'docs/evidence/garden-desktop.png', fullPage: true });
+  await page.setViewportSize({width:360,height:800});
+  await page.screenshot({path:'docs/evidence/garden-mobile.png',fullPage:true});
+  const checks = [];
+  async function width(label) {
+    const size=await page.evaluate(()=>({document:document.documentElement.scrollWidth, viewport:window.innerWidth}));
+    checks.push({label,...size}); if(size.document>size.viewport)throw new Error(label+' horizontal overflow '+JSON.stringify(size));
+  }
+  await width('garden-mobile');
+  await page.getByRole('button', {name:/Inspect/}).nth(4).click();
+  if(!(await page.getByRole('region',{name:'Selected idea'}).evaluate(el=>el===document.activeElement)))throw Error('Mobile inspector focus failed');
+  const inspectorY=await page.getByRole('region',{name:'Selected idea'}).evaluate(el=>el.getBoundingClientRect().top);
+  if(inspectorY>=800)throw Error('Selected inspector was not revealed');
+  await page.getByRole('button',{name:'Notebook',exact:true}).click(); await width('notebook-mobile');
+  await page.getByRole('button',{name:'Search',exact:true}).click(); await width('search-mobile');
+  await page.getByRole('button',{name:'Settings',exact:true}).click(); await width('settings-mobile');
+  await page.getByRole('button',{name:'Garden',exact:true}).click();
+  await page.getByLabel('New idea',{exact:true}).fill('QA: a saved garden goal');
+  await page.getByRole('button',{name:'Add idea',exact:true}).click();
+  await width('idea-detail-mobile');
+  await page.getByRole('button',{name:'Edit idea',exact:true}).click();
+  await page.getByLabel('Next action',{exact:true}).fill('Write a short proof');
+  await page.getByRole('button',{name:'Save idea',exact:true}).click();
+  await page.getByRole('button',{name:'Start focus',exact:true}).click();
+  await page.getByLabel('What changed?',{exact:true}).fill('Recorded evidence survives a reload.');
+  await page.getByRole('button',{name:'Save progress',exact:true}).click();
+  await page.reload();
+  await page.getByRole('button',{name:'Inspect QA: a saved garden goal',exact:true}).click();
+  await page.getByText('Recorded evidence survives a reload.',{exact:true}).waitFor();
+  if(!(await page.getByText('Progress recorded',{exact:true}).count()))throw Error('Missing progress');
+  await page.getByRole('button',{name:'Seed a goal',exact:true}).click();
+  if(!(await page.getByLabel('New idea',{exact:true}).evaluate(el=>el===document.activeElement)))throw Error('Seed focus failed');
+  if(errors.length)throw Error(errors.join('\n'));
+  fs.writeFileSync('docs/evidence/garden-browser-checks.json',JSON.stringify({checks,errors,passed:['capture','edit next action','focus','record outcome','reload persistence','seed focus'],data:'Fresh isolated browser; illustrative examples and QA test goal only.'},null,2));
+  await browser.close();
+  console.log('Browser QA passed: '+JSON.stringify(checks));
+})().catch(e=>{console.error(e);process.exit(1)});

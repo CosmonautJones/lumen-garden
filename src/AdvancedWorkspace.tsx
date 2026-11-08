@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent, KeyboardEvent as ReactKeyboardEvent } fr
 import { relationLabel, selectNextSeed } from './domain/model'
 import type { BedHealth, FocusSession, ImportPreview, RelationType, SeedStatus } from './domain/model'
 import { GardenRepository } from './domain/repository'
+import { browserStorage } from './domain/browserStorage'
 import { IdeaActions } from './components/IdeaActions'
 import './AdvancedWorkspace.css'
 
@@ -25,7 +26,7 @@ const RECENCY_OPTIONS = ['all', '7', '30', '90'] as const
 type RecencyFilter = (typeof RECENCY_OPTIONS)[number]
 
 
-const DEFAULT_REPOSITORY = new GardenRepository(globalThis?.localStorage, {
+const DEFAULT_REPOSITORY = new GardenRepository(browserStorage, {
   storageKey: 'lumen-garden:local-repository',
 })
 

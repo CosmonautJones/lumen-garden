@@ -10,9 +10,13 @@ function setup() {
   repository.clearDemoData()
   return repository
 }
+function renderNotebook(repository: GardenRepository) {
+  render(<App repository={repository} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Notebook' }))
+}
 it('offers one capture field and opens the captured idea without advanced controls', async () => {
   const user = userEvent.setup(); const repository = setup()
-  render(<App repository={repository} />)
+  renderNotebook(repository)
   expect(screen.getByRole('heading', { name: 'What do you want to move forward?' })).toBeInTheDocument()
   expect(screen.getAllByRole('textbox')).toHaveLength(1)
   expect(screen.queryByLabelText('Energy')).not.toBeInTheDocument()
@@ -24,7 +28,7 @@ it('offers one capture field and opens the captured idea without advanced contro
 it('keeps the next action and records progress in the same detail view', async () => {
   const user = userEvent.setup(); const repository = setup()
   repository.captureSeed({ text: 'Prepare for an interview' })
-  render(<App repository={repository} />)
+  renderNotebook(repository)
   await user.click(screen.getByRole('button', { name: /Open Prepare for an interview/ }))
   await user.click(screen.getByRole('button', { name: 'Edit idea' }))
   await user.type(screen.getByLabelText('Next action'), 'Practice one debugging story')
@@ -42,7 +46,7 @@ it('finds archived work and restores it without losing its next action', async (
   const user = userEvent.setup(); const repository = setup()
   const seed = repository.captureSeed({ text: 'Interview story' })
   repository.editSeed(seed.id, { text: seed.text, note: '', nextAction: 'Practice debugging' })
-  render(<App repository={repository} />)
+  renderNotebook(repository)
   await user.click(screen.getByRole('button', { name: /Open Interview story/ }))
   await user.click(screen.getByRole('button', { name: 'Archive idea' }))
   expect(screen.queryByRole('button', { name: /Open Interview story/ })).not.toBeInTheDocument()
@@ -55,7 +59,7 @@ it('finds archived work and restores it without losing its next action', async (
 })
 it('preserves a capture draft when storage rejects a write', async () => {
   const user = userEvent.setup(); const repository = setup()
-  render(<App repository={repository} />)
+  renderNotebook(repository)
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full') })
   await user.type(screen.getByLabelText('New idea'), 'Keep my draft')
   await user.click(screen.getByRole('button', { name: 'Add idea' }))
@@ -66,7 +70,7 @@ it('preserves a capture draft when storage rejects a write', async () => {
 it('invalidates changed import previews and requires confirmation to replace data', async () => {
   const user = userEvent.setup(); const repository = setup()
   repository.captureSeed({ text: 'Keep this' }); const backup = repository.exportData()
-  render(<App repository={repository} />)
+  renderNotebook(repository)
   await user.click(screen.getByRole('button', { name: 'Settings' }))
   fireEvent.change(screen.getByLabelText('Import JSON'), { target: { value: backup } })
   await user.click(screen.getByRole('button', { name: 'Preview import' }))
@@ -87,7 +91,7 @@ it('resumes saved work after reload with its next action and draft outcome intac
   repository.setFocusOutcome(session.id, 'Outlined the data compatibility checks')
   repository.pauseFocusSession(session.id)
   const reloaded = new GardenRepository(localStorage)
-  render(<App repository={reloaded} />)
+  renderNotebook(reloaded)
   await user.click(screen.getByRole('button', { name: /Open Ship a thoughtful portfolio/ }))
   expect(screen.getByText('Write the migration story')).toBeInTheDocument()
   expect(screen.getByLabelText('What changed?')).toHaveValue('Outlined the data compatibility checks')

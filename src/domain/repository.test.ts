@@ -22,7 +22,7 @@ class MemoryStorage {
   }
 }
 
-function createRepository(storage = new MemoryStorage()): GardenRepository {
+function createRepository(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = new MemoryStorage()): GardenRepository {
   let id = 0
   return new GardenRepository(storage, {
     now: () => 1_700_000_000_000,
@@ -31,6 +31,61 @@ function createRepository(storage = new MemoryStorage()): GardenRepository {
 }
 
 describe('GardenRepository', () => {
+  it.each(['active', 'paused', 'archived'])('clears examples without breaking a user idea in an example bed (%s)', mode => {
+    const storage = new MemoryStorage()
+    const repository = createRepository(storage)
+    const seed = repository.captureSeed({ text: 'My own work', note: 'Keep this context' })
+    repository.moveSeedToBed(seed.id, repository.getState().beds[0].id)
+    if (mode === 'paused') {
+      repository.startFocusSession(seed.id, 15)
+      repository.pauseFocusSession(repository.getActiveFocusSession()!.id)
+    }
+    if (mode === 'archived') repository.archiveSeed(seed.id)
+    const before = repository.exportData()
+    repository.clearDemoData()
+    const reloaded = createRepository(storage)
+    expect(reloaded.getStorageIssue()).toBeNull()
+    expect(reloaded.getSeed(seed.id)).toMatchObject({ text: 'My own work', note: 'Keep this context', status: mode === 'paused' ? 'focused' : mode === 'archived' ? 'archived' : 'inbox' })
+    expect(reloaded.getSeed(seed.id)?.bedId).toBeUndefined()
+    if (mode === 'paused') {
+      expect(reloaded.getActiveFocusSession()).toMatchObject({ status: 'paused', previousSeedStatus: 'inbox' })
+      reloaded.completeFocusSession(reloaded.getActiveFocusSession()!.id, 'Kept my progress')
+      expect(createRepository(storage).getSeed(seed.id)?.status).toBe('inbox')
+    }
+    repository.undoLast()
+    expect(repository.exportData()).toBe(before)
+  })
+
+  it.each(['startedAt', 'endedAt', 'pausedAt'])('rejects unrenderable focus %s timestamps without changing accepted data', field => {
+    const repository = createRepository()
+    const seed = repository.captureSeed({ text: 'Keep valid dates' })
+    repository.startFocusSession(seed.id, 5)
+    repository.completeFocusSession(repository.getActiveFocusSession()!.id, 'A recorded result')
+    const before = repository.exportData()
+    const payload = JSON.parse(before)
+    payload.focusSessions[0][field] = 1e20
+    expect(() => repository.previewImport(JSON.stringify(payload))).toThrow(/focus session/i)
+    expect(() => repository.importData(JSON.stringify(payload))).toThrow(/focus session/i)
+    expect(repository.exportData()).toBe(before)
+  })
+
+  it('opens recovery safely when storage reads fail and refuses to overwrite unread data', () => {
+    const values = new Map([[STORAGE_KEY, 'Unread original notebook']])
+    let readable = false
+    const storage = {
+      getItem: (key: string) => { if (!readable) throw new DOMException('Read denied', 'SecurityError'); return values.get(key) ?? null },
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    }
+    const repository = createRepository(storage)
+    expect(repository.getStorageIssue()).toMatchObject({ kind: 'read', recoveryAvailable: false })
+    expect(repository.getState().seeds).toEqual([])
+    readable = true
+    expect(() => repository.captureSeed({ text: 'Do not overwrite unread work' })).toThrow(/reload/i)
+    expect(values.get(STORAGE_KEY)).toBe('Unread original notebook')
+    expect(repository.getState().seeds).toEqual([])
+  })
+
   it('provides a cached snapshot that changes after a mutation', () => {
     const repository = createRepository()
     const beforeCapture = repository.getSnapshot()

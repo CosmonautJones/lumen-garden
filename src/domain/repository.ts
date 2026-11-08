@@ -104,7 +104,7 @@ function getSchemaVersion(raw: LegacyPayload, fallback = 1): number {
 }
 
 function normalizeTimestamp(value: unknown, fallback: number): number {
-  if (typeof value === 'number' && value > 0 && Number.isFinite(value)) {
+  if (isFiniteTimestamp(value)) {
     return value
   }
 
@@ -310,7 +310,7 @@ function isOneOf<T extends string>(value: unknown, values: readonly T[]): value 
 }
 
 function isFiniteTimestamp(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
+  return typeof value === 'number' && value > 0 && Number.isFinite(new Date(value).getTime())
 }
 
 function validateCurrentPayload(raw: LegacyPayload): void {
@@ -431,7 +431,9 @@ function validateCurrentPayload(raw: LegacyPayload): void {
       !Number.isInteger(session.durationMinutes) ||
       session.durationMinutes < 1 ||
       session.durationMinutes > 240 ||
-      !isFiniteTimestamp(session.startedAt)
+      !isFiniteTimestamp(session.startedAt) ||
+      (session.endedAt !== undefined && !isFiniteTimestamp(session.endedAt)) ||
+      (session.pausedAt !== undefined && !isFiniteTimestamp(session.pausedAt))
     ) {
       throw new Error('Imported focus session is invalid')
     }
@@ -560,6 +562,7 @@ export class GardenRepository {
   private undoStack: UndoEntry[] = []
   private malformedPayload: string | null = null
   private storageIssue: StorageIssue | null = null
+  private storageReadBlocked = false
 
   constructor(storage: StorageLike, options: RepoOptions = {}) {
     this.storage = storage
@@ -979,11 +982,25 @@ export class GardenRepository {
         const userSeeds = state.seeds.filter((seed) => seed.source !== 'demo')
         const userSeedIds = new Set(userSeeds.map((seed) => seed.id))
         state.beds = state.beds.filter((bed) => bed.source !== 'demo')
+        const retainedBedIds = new Set(state.beds.map((bed) => bed.id))
+        const detachedSeedIds = new Set<string>()
+        for (const seed of userSeeds) {
+          if (seed.bedId && !retainedBedIds.has(seed.bedId)) {
+            detachedSeedIds.add(seed.id)
+            delete seed.bedId
+            if (seed.status === 'active') seed.status = 'inbox'
+          }
+        }
         state.seeds = userSeeds
         state.threads = state.threads.filter(
           (thread) => userSeedIds.has(thread.fromSeedId) && userSeedIds.has(thread.toSeedId),
         )
         state.focusSessions = state.focusSessions.filter((session) => userSeedIds.has(session.seedId))
+        for (const session of state.focusSessions) {
+          if (detachedSeedIds.has(session.seedId) && session.previousSeedStatus === 'active') {
+            session.previousSeedStatus = 'inbox'
+          }
+        }
         state.meta.demoData = false
       },
       { label: 'Clear demo data', recordUndo: true },
@@ -1027,7 +1044,18 @@ export class GardenRepository {
   }
 
   private load(): GardenState {
-    const rawValue = this.storage.getItem(this.storageKey)
+    let rawValue: string | null
+    try {
+      rawValue = this.storage.getItem(this.storageKey)
+    } catch (error) {
+      this.storageReadBlocked = true
+      this.storageIssue = {
+        kind: 'read',
+        detail: error instanceof Error ? error.message : 'Browser storage could not be read',
+        recoveryAvailable: false,
+      }
+      return createFallbackGarden(this.now)
+    }
     if (!rawValue) {
       return createDemoGarden(this.now, this.idFactory)
     }
@@ -1063,6 +1091,9 @@ export class GardenRepository {
   }
 
   private persist(state: GardenState): void {
+    if (this.storageReadBlocked) {
+      throw new Error('Browser storage could not be read. Allow site storage and reload before saving, so existing ideas are not overwritten')
+    }
     if (this.malformedPayload !== null) {
       this.storage.setItem(`${this.storageKey}:recovery`, this.malformedPayload)
     }

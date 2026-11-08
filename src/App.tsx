@@ -1,13 +1,15 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FocusSession, ImportPreview, Seed } from './domain/model'
 import { GardenRepository } from './domain/repository'
+import { browserStorage } from './domain/browserStorage'
 import { IdeaActions } from './components/IdeaActions'
+import GardenWorkspace from './GardenWorkspace'
 import './App.css'
 
 const AdvancedWorkspace = lazy(() => import('./AdvancedWorkspace'))
-const defaultRepository = new GardenRepository(globalThis?.localStorage, { storageKey: 'lumen-garden:local-repository' })
+const defaultRepository = new GardenRepository(browserStorage, { storageKey: 'lumen-garden:local-repository' })
 type Props = { repository?: GardenRepository }
-type Page = 'home' | 'search' | 'settings' | 'advanced'
+type Page = 'garden' | 'home' | 'search' | 'settings' | 'advanced'
 
 function download(data: string, filename: string) {
   const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }))
@@ -22,8 +24,9 @@ function remaining(session: FocusSession, now: number) {
 
 export default function App({ repository = defaultRepository }: Props) {
   const state = useSyncExternalStore(listener => repository.subscribe(listener), () => repository.getSnapshot())
-  const [page, setPage] = useState<Page>('home')
+  const [page, setPage] = useState<Page>('garden')
   const [selectedId, setSelectedId] = useState('')
+  const [inspectedId, setInspectedId] = useState('')
   const [capture, setCapture] = useState('')
   const [context, setContext] = useState('')
   const [withContext, setWithContext] = useState(false)
@@ -47,7 +50,7 @@ export default function App({ repository = defaultRepository }: Props) {
     catch (failure) { setError(`Could not save this change. ${failure instanceof Error ? failure.message : String(failure)}. Your accepted data is unchanged.`); return false }
   }
   function navigate(next: Page) { setSelectedId(''); setPage(next); setNotice('') }
-  function open(seed: Seed) { setSelectedId(seed.id); setNotice(''); setError('') }
+  function open(seed: Seed) { setInspectedId(seed.id); setSelectedId(seed.id); setNotice(''); setError('') }
   const results = state.seeds.filter(seed => page === 'search'
     ? [seed.text, seed.note, seed.nextAction, ...seed.tags].join(' ').toLowerCase().includes(query.toLowerCase().trim())
     : seed.status !== 'archived').slice().sort((a, b) => {
@@ -57,24 +60,26 @@ export default function App({ repository = defaultRepository }: Props) {
     })
   const visible = page === 'search' || showAll ? results : results.slice(0, 5)
 
-  return <div className="lumen">
+  return <div className={`lumen ${page === 'garden' && !selected ? 'garden-skin' : ''}`}>
     <a className="skip-link" href="#workspace">Skip to content</a>
     <header className="lumen-header">
-      <button className="wordmark" onClick={() => navigate('home')} aria-label="Lumen home"><span className="lumen-mark" aria-hidden="true" />lumen<span className="wordmark-note">A little clarity.</span></button>
+      <button className="wordmark wordmark-garden" onClick={() => navigate('garden')} aria-label="Lumen home"><span className="lumen-mark" aria-hidden="true" />Lumen Garden</button>
       <nav aria-label="Main navigation">
+        <button className={page === 'garden' ? 'nav-selected' : ''} onClick={() => navigate('garden')} aria-current={page === 'garden' ? 'page' : undefined}>Garden</button>
+        <button className={page === 'home' ? 'nav-selected' : ''} onClick={() => navigate('home')} aria-current={page === 'home' ? 'page' : undefined}>Notebook</button>
         <button className={page === 'search' ? 'nav-selected' : ''} onClick={() => navigate('search')} aria-current={page === 'search' ? 'page' : undefined}>Search</button>
         <button className={page === 'settings' ? 'nav-selected' : ''} onClick={() => navigate('settings')} aria-current={page === 'settings' ? 'page' : undefined}>Settings</button>
       </nav>
     </header>
-    <main id="workspace" className={page === 'advanced' ? 'advanced-container' : 'lumen-main'}>
+    <main id="workspace" className={page === 'advanced' ? 'advanced-container' : page === 'garden' && !selected ? 'garden-container' : 'lumen-main'}>
       {error && <p className="lumen-alert" role="alert">{error}</p>}
-      {issue && !error && <aside className="lumen-alert" role="alert">Local storage needs attention. {issue.kind === 'read' ? 'Your original data is preserved for recovery.' : 'Your last change could not be saved.'} <button onClick={() => navigate('settings')}>Open recovery settings</button></aside>}
+      {issue && !error && <aside className="lumen-alert" role="alert">Local storage needs attention. {issue.kind === 'read' ? issue.recoveryAvailable ? 'Your original data is preserved for recovery.' : 'Browser storage could not be read. Allow site storage, then reload. No existing notebook has been replaced.' : 'Your last change could not be saved.'} <button onClick={() => navigate('settings')}>Open recovery settings</button></aside>}
       {notice && <p className="lumen-notice" role="status">{notice}</p>}
       {selected ? <>
         <button className="back-link" onClick={() => setSelectedId('')}>← {page === 'search' ? 'Search results' : 'All ideas'}</button>
         <div className="detail-heading"><p className="overline">{selected.source === 'demo' ? 'Example idea' : selected.status === 'archived' ? 'Archived idea' : 'Your workspace'}</p><h1 ref={titleRef} tabIndex={-1}>{selected.text}</h1></div>
         <IdeaDetail key={selected.id} seed={selected} repository={repository} run={run} onArchive={() => { setSelectedId(''); setNotice('Idea archived. Find it in Search, or undo below.') }} />
-      </> : page === 'home' ? <>
+      </> : page === 'garden' ? <GardenWorkspace selectedId={inspectedId} onSelect={setInspectedId} state={state} draft={capture} onDraftChange={setCapture} headingRef={titleRef} onOpen={open} onCapture={text => run(() => { const seed = repository.captureSeed({ text, note: context }); open(seed); setContext(''); setWithContext(false) })} onClearExamples={() => { if (window.confirm('Remove example ideas? Your own ideas will stay.')) run(() => repository.clearDemoData()) }} /> : page === 'home' ? <>
         <section className="welcome">
           <p className="overline">SPACE TO THINK. ROOM TO DO.</p>
           <h1 ref={titleRef} tabIndex={-1}>What do you want<br className="desktop-break" /> to move forward?</h1>
@@ -108,7 +113,7 @@ export default function App({ repository = defaultRepository }: Props) {
       </section> : <><button className="back-link" onClick={() => navigate('home')}>← Back to simple workspace</button><Suspense fallback={<p>Opening workspace…</p>}><AdvancedWorkspace repository={repository} /></Suspense></>}
       {undo && <div className="undo-toast"><span>{undo.label}</span><button onClick={() => run(() => { repository.undoLast(); setNotice('Change undone.') })}>Undo</button></div>}
     </main>
-    <footer className="lumen-footer"><span><span className="local-dot" aria-hidden="true" /> Stored on this device</span><span>One thing at a time.</span></footer>
+    <footer className="lumen-footer"><span><span className="local-dot" aria-hidden="true" /> {issue?.kind === 'read' ? 'Storage needs attention' : 'Stored on this device'}</span><span>One thing at a time.</span></footer>
   </div>
 }
 function IdeaList({ ideas, activeId, open }: { ideas: Seed[]; activeId?: string; open: (seed: Seed) => void }) {

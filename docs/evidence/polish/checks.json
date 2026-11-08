@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-08T11:26:39.182Z",
+  "browser": "Chromium",
+  "transport": "Production assets fulfilled locally by Playwright; no HTTP server integration.",
+  "data": "Fresh isolated browser contexts; only synthetic QA records and labeled examples.",
+  "results": [
+    {
+      "name": "pass1-selection-and-keyboard",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass1-mobile-selection-and-draft",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass2-responsive-long-content",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass2-breakpoint-capture-and-navigation",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass2-readable-text-and-touch",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-storage-getter-denied",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-storage-read-fails-no-overwrite",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-quota-and-retry",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-paused-focus-and-evidence-reload",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-clear-cancel-undo-and-archive",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-import-validation-confirmation-and-undo",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-corrupt-storage-recovery",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-empty-capture-and-export",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass2-reduced-motion",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass2-empty-state-contrast",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-clear-examples-with-personal-cross-link",
+      "status": "passed",
+      "pageErrors": []
+    },
+    {
+      "name": "pass3-invalid-date-import",
+      "status": "passed",
+      "pageErrors": []
+    }
+  ]
+}

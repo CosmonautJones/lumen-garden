@@ -23,4 +23,4 @@ Build an offline-first idea greenhouse where fragments become connected projects
 - Demo data is clearly demo data and removable.
 
 ## Visual direction
-Primary surface: a minimal home capture field, short Continue working list, and one focused idea detail. Search and Settings are secondary. Use soft white and graphite, restrained blue, readable system typography, generous space and precise keyboard-friendly controls. No botanical vocabulary in primary flows, glassmorphism, fake metrics or icon confetti. Keep the original Operate/Explore tools optional under Settings → Advanced workspace.
+Primary surface: a playful Garden of selectable idea plants with quick capture and a selected-idea panel. Use warm cream, natural greens, botanical illustrations and readable type. Derive all statuses and evidence from notebook records; examples must remain labeled, and recorded outcomes must never imply independent verification or unattended execution. Keep the minimal Notebook view, Search, Settings, and original Operate/Explore tools under Settings -> Advanced workspace. Preserve keyboard access, mobile layout, and all existing local-data protections.
